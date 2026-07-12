@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.user import User
@@ -38,3 +39,17 @@ def get_current_user(
         raise _INVALID_TOKEN
 
     return CurrentUser(user_id=user.id, business_id=user.business_id)
+
+
+def get_current_admin_user(
+    current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)
+) -> CurrentUser:
+    """Gates the internal admin page (CLAUDE.md's "just for me" page) —
+    allow-listed by login email via ADMIN_EMAILS, not a new role/schema
+    column, since that page is intentionally minimal for now.
+    """
+    admin_emails = {e.strip().lower() for e in settings.admin_emails.split(",") if e.strip()}
+    user = db.get(User, current_user.user_id)
+    if not user or user.email.lower() not in admin_emails:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    return current_user

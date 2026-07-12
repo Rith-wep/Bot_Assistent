@@ -97,9 +97,22 @@ class BotEngine:
 
         logger.info("%d/%d bot(s) running.", len(self.running), len(configs))
 
+    async def _stop_one(self, business_id: int) -> None:
+        app = self.running.pop(business_id, None)
+        if app is None:
+            return
+        try:
+            await app.updater.stop()
+            await app.stop()
+            await app.shutdown()
+            logger.info("business_id=%s: bot stopped", business_id)
+        except Exception:
+            logger.exception("business_id=%s: error while stopping bot", business_id)
+
     async def poll_for_new_bots(self) -> None:
         """Simple polling loop: picks up bot_configs added/activated while running
-        (e.g. a new business finishing onboarding), without needing a restart.
+        (e.g. a new business finishing onboarding) and stops ones that were
+        disconnected/deactivated (e.g. from Settings) — without needing a restart.
         """
         while True:
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
@@ -108,6 +121,14 @@ class BotEngine:
                 configs = _load_active_bot_configs(db)
             finally:
                 db.close()
+
+            active_business_ids = {c["business_id"] for c in configs}
+            for business_id in list(self.running.keys()):
+                if business_id not in active_business_ids:
+                    logger.info(
+                        "business_id=%s: no longer an active bot_config, stopping", business_id
+                    )
+                    await self._stop_one(business_id)
 
             for config in configs:
                 if config["business_id"] not in self.running:
@@ -119,14 +140,8 @@ class BotEngine:
                     await self._start_one(config)
 
     async def stop_all(self) -> None:
-        for business_id, app in list(self.running.items()):
-            try:
-                await app.updater.stop()
-                await app.stop()
-                await app.shutdown()
-                logger.info("business_id=%s: bot stopped", business_id)
-            except Exception:
-                logger.exception("business_id=%s: error while stopping bot", business_id)
+        for business_id in list(self.running.keys()):
+            await self._stop_one(business_id)
 
     async def run_forever(self) -> None:
         await self.start_all()

@@ -42,7 +42,7 @@ export default function SignUp() {
         },
       });
       login(data.access_token, data.business_name);
-      navigate("/knowledge");
+      navigate("/app");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -130,7 +130,7 @@ export default function SignUp() {
 
         <p className="mt-6 text-center text-sm text-shell-text-muted">
           Already have an account?{" "}
-          <Link to="/signin" className="font-semibold text-accent hover:text-accent-dark">
+          <Link to="/app/signin" className="font-semibold text-accent hover:text-accent-dark">
             Sign in
           </Link>
         </p>

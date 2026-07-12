@@ -1,9 +1,13 @@
+from app.models.admin import Admin
+from app.models.admin_invite import AdminInvite
 from app.models.bot_config import BotConfig
 from app.models.business import Business
 from app.models.conversation import Conversation
 from app.models.knowledge_item import KnowledgeItem
 from app.models.lead import Lead
 from app.models.message import Message
+from app.models.question_cluster import QuestionCluster
+from app.models.unanswered_question import UnansweredQuestion
 from app.models.user import User
 
 __all__ = [
@@ -14,4 +18,8 @@ __all__ = [
     "Conversation",
     "Message",
     "Lead",
+    "Admin",
+    "AdminInvite",
+    "UnansweredQuestion",
+    "QuestionCluster",
 ]

@@ -3,11 +3,11 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const NAV_ITEMS = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: false },
-  { to: "/knowledge", label: "Knowledge", icon: BookOpen, enabled: true },
-  { to: "/leads", label: "Leads", icon: Users, enabled: false },
-  { to: "/conversations", label: "Conversations", icon: MessageSquare, enabled: false },
-  { to: "/settings", label: "Settings", icon: Settings, enabled: false },
+  { to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: true },
+  { to: "/app/knowledge", label: "Knowledge", icon: BookOpen, enabled: true },
+  { to: "/app/leads", label: "Leads", icon: Users, enabled: true },
+  { to: "/app/conversations", label: "Conversations", icon: MessageSquare, enabled: true },
+  { to: "/app/settings", label: "Settings", icon: Settings, enabled: true },
 ];
 
 function NavItems({ orientation }) {

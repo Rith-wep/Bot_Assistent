@@ -16,6 +16,7 @@ from app.db.session import SessionLocal
 from app.repositories.bot_config import BotConfigRepository
 from app.repositories.business import BusinessRepository
 from app.repositories.knowledge_item import KnowledgeItemRepository
+from app.services.telegram_api import get_bot_info
 
 BUSINESS_NAME = "Test Phone Shop"
 
@@ -109,6 +110,10 @@ def main() -> None:
         if not token or not owner_chat_id_raw:
             raise SystemExit("Both a bot token and an owner chat ID are required.")
 
+        bot_info = get_bot_info(token)
+        if bot_info is None:
+            raise SystemExit("That token isn't valid — double-check it against BotFather.")
+
         business = business_repo.create(
             name=BUSINESS_NAME,
             business_type="shop",
@@ -120,6 +125,7 @@ def main() -> None:
 
         BotConfigRepository(db, business.id).create(
             telegram_bot_token_encrypted=encrypt_secret(token),
+            bot_username=bot_info["username"],
             owner_chat_id=int(owner_chat_id_raw),
             is_active=True,
         )

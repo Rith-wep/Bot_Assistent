@@ -1,11 +1,14 @@
 import { LogOut } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Sidebar from "./Sidebar";
 
 export default function Layout({ children }) {
   const { isAuthenticated, businessName, logout } = useAuth();
+  const location = useLocation();
 
-  if (!isAuthenticated) {
+  // Onboarding renders its own full-page shell — no dashboard sidebar/nav.
+  if (!isAuthenticated || location.pathname.startsWith("/app/onboarding")) {
     return <>{children}</>;
   }
 

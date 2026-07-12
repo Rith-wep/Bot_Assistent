@@ -25,8 +25,9 @@ from google.genai import types
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.models.business import Business
 from app.models.conversation import Conversation
-from app.services import conversation_state
+from app.services import conversation_state, gaps
 from app.services.knowledge import build_business_info_text
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,18 @@ FALLBACK_REPLY = (
 )
 
 _GEMINI_ROLE = {"customer": "user", "bot": "model"}
+
+_TONE_INSTRUCTIONS = {
+    "friendly": "",
+    "professional": (
+        "\n\nUse a more formal, professional register in every reply, while remaining "
+        "polite and warm."
+    ),
+    "short": (
+        "\n\nKeep replies as brief as possible — prefer a single short sentence "
+        "whenever it fully answers the question."
+    ),
+}
 
 _CLASSIFIER_INSTRUCTION = (
     "You are an internal classifier for a customer support conversation. You are "
@@ -88,13 +101,107 @@ _CLASSIFICATION_SCHEMA = types.Schema(
 )
 
 
-def _build_system_instruction(business_id: int, db: Session, handoff_active: bool) -> str:
-    """Combine the shared personality rules with this business's knowledge_items."""
-    knowledge_items = conversation_state.get_knowledge_items(db, business_id)
+_CLUSTER_INSTRUCTION = (
+    "You are grouping customer support questions that a business's AI assistant "
+    "could not answer, so the owner can see what knowledge is missing. You are "
+    "given a list of existing open topic clusters (each with a label and sample "
+    "questions) and a list of new unclustered questions (mixed English/Khmer, "
+    "including Latin-letter Khmer).\n\n"
+    "Group by SUBJECT — the specific thing, product, service, or procedure the "
+    "question is about (e.g. 'braces', 'dental implants', 'delivery to Siem "
+    "Reap') — NOT by which aspect of it is being asked. Price, availability, "
+    "how it works, and other angles on the SAME subject all belong in ONE "
+    "cluster. For example 'how much are braces', 'do you guys do braces', and "
+    "'what's the price for teeth braces treatment' are three phrasings of the "
+    "SAME subject (braces) and must be ONE cluster, even though one asks about "
+    "price and another about availability. Only start a new cluster when the "
+    "underlying subject itself is different — braces and dental implants are "
+    "different subjects (different procedures) even though both are dental "
+    "work, so those must NOT be merged.\n\n"
+    "For EACH new question, decide: does it belong to one of the existing "
+    "clusters (same subject), or does it start a new subject? Each output "
+    "cluster must either match exactly one existing cluster (set "
+    "existing_cluster_index to that cluster's index) or be a brand new subject "
+    "(set existing_cluster_index to null). Every new question index must appear "
+    "in exactly one output cluster, and each index must be used only once.\n\n"
+    "For a NEW cluster, write a short (1-4 word) label naming the SUBJECT "
+    "itself, not the aspect being asked about, in both English and Khmer (e.g. "
+    "label_en='Braces', label_km='ពត់ធ្មេញ' — not 'Braces pricing' or 'Braces "
+    "availability'). For a cluster matched to an EXISTING cluster, repeat that "
+    "existing cluster's label_en/label_km unchanged."
+)
+
+_CLUSTER_SCHEMA = types.Schema(
+    type="OBJECT",
+    properties={
+        "clusters": types.Schema(
+            type="ARRAY",
+            items=types.Schema(
+                type="OBJECT",
+                properties={
+                    "existing_cluster_index": types.Schema(type="INTEGER", nullable=True),
+                    "label_en": types.Schema(type="STRING"),
+                    "label_km": types.Schema(type="STRING"),
+                    "question_indices": types.Schema(
+                        type="ARRAY", items=types.Schema(type="INTEGER")
+                    ),
+                },
+                required=["label_en", "label_km", "question_indices"],
+            ),
+        ),
+    },
+    required=["clusters"],
+)
+
+
+async def cluster_questions(
+    existing_clusters: list[dict], new_questions: list[dict]
+) -> Optional[list[dict]]:
+    """Group one business's new unanswered questions into topics, matching
+    against its existing open clusters where the topic is the same.
+
+    existing_clusters: [{"index": int, "label_en": str, "label_km": str, "sample_questions": [str]}]
+    new_questions: [{"index": int, "text": str}]
+
+    Returns the raw "clusters" list from the model, or None on failure — the
+    caller should treat that business as unclustered this run and retry next time.
+    """
+    prompt = json.dumps(
+        {"existing_clusters": existing_clusters, "new_questions": new_questions},
+        ensure_ascii=False,
+    )
+    try:
+        response = await _client.aio.models.generate_content(
+            model=settings.ai_model,
+            contents=[types.Content(role="user", parts=[types.Part(text=prompt)])],
+            config=types.GenerateContentConfig(
+                system_instruction=_CLUSTER_INSTRUCTION,
+                response_mime_type="application/json",
+                response_schema=_CLUSTER_SCHEMA,
+            ),
+        )
+        return json.loads(response.text)["clusters"]
+    except Exception:
+        logger.warning("Gemini clustering call failed", exc_info=True)
+        return None
+
+
+def _build_system_instruction(business: Business, db: Session, handoff_active: bool) -> str:
+    """Combine the shared personality rules with this business's tone,
+    display name, and knowledge_items.
+    """
+    knowledge_items = conversation_state.get_knowledge_items(db, business.id)
     business_info = build_business_info_text(knowledge_items)
-    instruction = (
-        f"{_RULES_TEXT}\n\n"
-        "## Business Information (your ONLY source of facts — never use anything else)\n\n"
+
+    intro = (
+        f"You are '{business.assistant_display_name}', the customer assistant for this business.\n\n"
+        if business.assistant_display_name
+        else ""
+    )
+    instruction = f"{intro}{_RULES_TEXT}"
+    instruction += _TONE_INSTRUCTIONS.get(business.tone.value, "")
+    instruction += (
+        "\n\n## Business Information (your ONLY source of facts — never use anything else)\n\n"
         f"{business_info}"
     )
     if handoff_active:
@@ -150,7 +257,11 @@ async def _classify(contents: list[types.Content], assistant_reply: str) -> Opti
 
 
 def _apply_conversation_flags(
-    business_id: int, chat_id: int, conversation: Conversation, classification: Optional[dict]
+    business_id: int,
+    chat_id: int,
+    conversation: Conversation,
+    classification: Optional[dict],
+    handoff_on_unsure: bool,
 ) -> Optional[str]:
     """Update handoff/streak state from the classifier output; return a handoff reason if needed."""
     if not classification:
@@ -162,6 +273,8 @@ def _apply_conversation_flags(
         return classification.get("reason") or "Customer asked for a human or seems upset."
 
     if classification.get("could_not_answer"):
+        if not handoff_on_unsure:
+            return None
         streak = conversation_state.increment_unanswered_streak(business_id, chat_id)
         if streak >= 2:
             conversation_state.set_handed_off(conversation, True)
@@ -184,12 +297,13 @@ async def get_ai_reply(
     - lead: a dict with name/phone/interest if a complete lead was just detected, else None.
     - handoff_reason: a short string if this turn should escalate to a human, else None.
     """
+    business = db.get(Business, business_id)
     conversation = conversation_state.get_active_conversation(db, business_id, chat_id)
     history = conversation_state.get_recent_messages(db, business_id, conversation.id, MAX_EXCHANGES)
     contents = _to_contents(history)
     contents.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
 
-    system_instruction = _build_system_instruction(business_id, db, conversation.handed_off)
+    system_instruction = _build_system_instruction(business, db, conversation.handed_off)
 
     try:
         reply = await _generate_reply(contents, system_instruction)
@@ -202,6 +316,30 @@ async def get_ai_reply(
 
     classification = await _classify(contents, reply)
     lead = classification.get("lead") if classification else None
-    handoff_reason = _apply_conversation_flags(business_id, chat_id, conversation, classification)
+
+    if classification and classification.get("could_not_answer"):
+        gaps.record_unanswered_question(db, business_id, conversation.id, user_message)
+
+    handoff_reason = _apply_conversation_flags(
+        business_id, chat_id, conversation, classification, business.handoff_on_unsure
+    )
 
     return reply, lead, handoff_reason, conversation
+
+
+async def generate_preview_reply(
+    db: Session, business_id: int, history: list[dict], user_message: str
+) -> str:
+    """Onboarding test-chat: same prompt + knowledge as a real customer would
+    get, but nothing is persisted and there's no lead/handoff detection —
+    it's a sandbox for the owner to try questions, not a real conversation.
+    """
+    business = db.get(Business, business_id)
+    contents = [
+        types.Content(role=_GEMINI_ROLE[h["role"]], parts=[types.Part(text=h["text"])])
+        for h in history
+    ]
+    contents.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
+
+    system_instruction = _build_system_instruction(business, db, handoff_active=False)
+    return await _generate_reply(contents, system_instruction)

@@ -1,8 +1,7 @@
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.knowledge_item import KnowledgeCategory
+from app.schemas.common import UtcDatetime
 
 
 class KnowledgeItemCreate(BaseModel):
@@ -33,4 +32,4 @@ class KnowledgeItemOut(BaseModel):
     content_en: str | None
     price: str | None
     sort_order: int
-    updated_at: datetime
+    updated_at: UtcDatetime

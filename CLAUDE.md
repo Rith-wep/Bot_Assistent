@@ -87,6 +87,114 @@ secrets: encrypt at rest, never log them, never return them fully via API
 - Rate-limit and error behavior per v1: never crash, polite apology in the
   customer's language, retry with backoff, log errors with business_id context.
 
+## Weekly Intelligence (unanswered-question insights)
+
+A feature layered on top of the core platform (build it after the core
+build order below is stable, using its own build order at the end of this
+section). It turns the "could not answer" signal the engine already
+produces for handoff into a feedback loop that helps owners close knowledge
+gaps, plus a weekly digest so they don't have to check the dashboard to
+know how the week went.
+
+**Flow:** engine detects a gap (existing classifier signal, same one behind
+the unanswered-streak/handoff logic) → captured as a row → a nightly job
+clusters that business's open gaps into human-readable topics → the
+dashboard surfaces the topics as one-click-fixable cards → a weekly
+Telegram message summarizes the week and flags any open gaps.
+
+### Schema additions
+
+- **unanswered_questions**: id, business_id, conversation_id, question_text,
+  created_at, status (open/resolved/dismissed), cluster_id (nullable FK to
+  question_clusters, added once that table exists in part 2). Store ONLY
+  the question text — no other customer data duplicated into this table.
+- **question_clusters**: id, business_id, label_en, label_km, question_count,
+  sample_questions (up to 3, JSONB array), first_seen, last_seen, status
+  (open/resolved/dismissed).
+- **businesses.last_summary_sent**: nullable datetime — records the ISO week
+  (Monday 00:00 ICT) the weekly summary was last sent for, so the job can
+  never double-send for the same week.
+
+### Nightly clustering job
+
+- Runs once per business per night: fetch that business's `open`
+  unanswered_questions, ask the AI module (the same provider-agnostic
+  module used for replies/classification — no new AI dependency) to group
+  semantically similar ones and produce a short bilingual label per group.
+  Batch several questions into one AI call rather than one call per
+  question — this has to stay cheap at scale.
+- Re-running must merge into existing open clusters for that business, not
+  create duplicates.
+- One business's failure (bad AI response, DB error) is caught, logged with
+  business_id, and must not stop the job for other businesses — same
+  isolation rule as the bot engine.
+
+### Weekly summary job
+
+- Runs Monday 8:00 AM Asia/Phnom_Penh (ICT), once per active business:
+  Telegram message to the owner, in the business's default_language, with
+  last week's conversations/messages, after-hours messages, new leads, and
+  handoffs counts — and, if open clusters exist, the count plus the top 1-2
+  cluster labels and a link to the dashboard Gaps page. Short, warm,
+  mobile-friendly, emoji-light; send a shorter, gentler version if the
+  business had zero activity that week.
+- Guarded by `businesses.last_summary_sent`: skip any business already sent
+  for the current ISO week. Must be safe to re-run/retry.
+
+### Scheduling convention
+
+No new infrastructure. Both jobs are plain CLI entry points
+(`python -m app.jobs.cluster_unanswered`, `python -m app.jobs.weekly_summary`)
+that process every eligible business in one run — same shape as
+`python -m app.run_bot`. In production, Railway's built-in Cron Job
+schedule triggers them; that's a scheduled invocation of the existing
+monolith, not a queue or a new service. Locally, running the same command
+by hand IS the test path (and doubles as the "manual trigger" needed for
+testing part 4) — there is no separate test mode; jobs are idempotent so
+running them twice is always safe.
+
+### Dashboard "Gaps" card + page
+
+- Dashboard card: "Customers asked about things you have no answer for" —
+  top open clusters (label — asked N times). Empty state: "No gaps — your
+  assistant answered everything it was asked. 🎉" via the shared
+  `EmptyState` component, not bare text.
+- Clicking a cluster opens the fix flow: sample questions plus a knowledge
+  item form pre-filled from the cluster (category guessed, title = the
+  cluster label, Khmer/English content left blank for the owner to write).
+  Save → creates the knowledge item, marks the cluster and its questions
+  resolved. Dismiss ("not relevant to my business") → marks the cluster and
+  its questions dismissed, no knowledge item created.
+- Resolved clusters show briefly as "Fixed ✓" (accent styling per the design
+  system below) before dropping off the list — the owner should feel the
+  progress.
+
+### Internal admin visibility
+
+- Per business, the internal admin page (see Web app pages below) adds:
+  open cluster count and last summary sent time. Build only the minimum
+  needed for that page to exist (list businesses + these two fields) rather
+  than its full eventual scope, unless the full page is separately
+  requested — it is not built yet as of this feature's start.
+
+### Build order for this feature (separate from the core build order —
+### stop for confirmation after each part, same rule as below)
+
+1. **Capture** — unanswered_questions table + engine hook that records
+   every "could not answer" moment.
+2. **Nightly clustering job.**
+3. **Dashboard Gaps card + page** (fix flow, dismiss).
+4. **Weekly summary job** (+ manual trigger command for testing).
+5. **Admin visibility.**
+
+Test plan required per part: unanswered capture correctness (ask multiple
+phrasings of one question, verify rows), clustering (variations form ONE
+cluster with a sensible bilingual label, re-running merges rather than
+duplicating), the one-click fix (creates knowledge, bot answers correctly
+afterward, cluster resolves), dismissal, the weekly summary (manual trigger,
+no double-send for the same week), and tenant isolation (business A must
+never see business B's clusters or questions).
+
 ## Frontend design system — "fresh green on deep slate"
 
 Applies to every page, present and future (Dashboard, Leads, Conversations,
@@ -98,7 +206,9 @@ components; use the token classes (`bg-base`, `text-accent`, etc.).
 section):**
 - `bg-base` (#1E2130) — dark shell: sidebar, auth pages.
 - `bg-surface` (#282C3E) — cards/panels/inputs on the dark shell.
-- `bg-page` (#F6F7F9) — light main content area background.
+- `bg-page` (#F0FDF4) — light main content area background, a soft fresh-green
+  tint. Deliberately paler than `accent-soft` so accent-soft badges/icon
+  circles on white cards still stand out against it.
 - `accent` (#22C55E) / `accent-dark` (#16A34A hover) / `accent-soft`
   (#DCFCE7 tint) — primary buttons, active nav item, prices, key stats.
 - `warning` (amber, #F59E0B) and `error` (red, #EF4444) — the only other
@@ -146,7 +256,9 @@ the heading font, not visual effects.
    - Step 4: test screen — a web-based preview chat that exercises the real
      prompt + knowledge so the owner can try their assistant before going live
 3. **Dashboard** — conversations today/this week, leads this week, after-hours
-   messages handled, handoffs. Simple cards + one chart.
+   messages handled, handoffs. Simple cards + one chart. Plus the "Gaps" card
+   (see Weekly Intelligence above) surfacing clustered unanswered-question
+   topics with a one-click fix flow into the knowledge editor.
 4. **Leads** — table (name, phone, interest, date), CSV export.
 5. **Conversations** — list + read-only transcript view.
 6. **Knowledge editor** — CRUD on knowledge_items; changes take effect on the
@@ -155,7 +267,8 @@ the heading font, not visual effects.
    plan display. Billing is MANUAL in v2: an admin (me) marks a business as
    paid; the UI only shows plan + status. No payment gateway yet.
 8. **Internal admin page** (just for me): list businesses, status, mark paid,
-   pause account.
+   pause account. Also shows, per business, open Weekly Intelligence cluster
+   count and last weekly-summary-sent time (see Weekly Intelligence above).
 
 ## API design conventions
 

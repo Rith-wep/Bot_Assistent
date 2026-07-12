@@ -3,6 +3,8 @@ const VARIANTS = {
     "bg-accent text-white hover:bg-accent-dark focus-visible:ring-accent shadow-sm",
   secondary:
     "border border-gray-300 bg-white text-ink hover:bg-gray-50 focus-visible:ring-accent",
+  outline:
+    "border border-accent/40 text-accent-dark bg-white hover:bg-accent-soft focus-visible:ring-accent",
   destructive:
     "border border-error/30 text-error hover:bg-error-soft focus-visible:ring-error",
   ghost: "text-ink-muted hover:bg-gray-100 focus-visible:ring-accent",
