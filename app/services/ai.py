@@ -186,6 +186,97 @@ async def cluster_questions(
         return None
 
 
+_KNOWLEDGE_CATEGORIES = ["service", "faq", "hours", "location", "policy", "other"]
+
+MAX_EXTRACT_ITEMS = 40
+
+_EXTRACT_INSTRUCTION = (
+    "You are helping a small business in Cambodia turn raw notes (a price list, "
+    "Facebook About text, a menu, or rough notes) into structured knowledge items "
+    "for their customer-support AI assistant. The source text may be English, "
+    "Khmer, or a mix, and may use Latin-letter transliterated Khmer.\n\n"
+    "For each distinct fact in the text (a service with its price, an FAQ, "
+    "opening hours, the location, a policy, or another standalone fact), output "
+    "one item with: category (one of service/faq/hours/location/policy/other), "
+    "a short title, price if one is present for that item (normalize to a plain "
+    "format like '$15' or '$20 - $40' — omit currency symbols only if none is "
+    "implied), content_en, and content_km.\n\n"
+    "CRITICAL — never invent: only output facts that are actually present in the "
+    "source text. Never invent, guess, or add a service, price, opening hours, or "
+    "location that is not stated. If the text has no hours or no location "
+    "mentioned anywhere, do NOT output an hours or location item at all.\n\n"
+    "Bilingual content: if the source text already gives you a language's wording "
+    "for that item, use it (lightly cleaned up, not rewritten) and set that "
+    "language's ai_generated flag to false. If the source only covers ONE "
+    "language for an item, naturally draft the OTHER language yourself — polite, "
+    "warm, and natural, in the same register a helpful shop assistant would use, "
+    "with correct Khmer honorifics when writing Khmer — and set that language's "
+    "ai_generated flag to true. Never leave both content_en and content_km empty.\n\n"
+    f"Output at most {MAX_EXTRACT_ITEMS} items. If the text contains no usable "
+    "business information, output an empty items list."
+)
+
+_EXTRACT_SCHEMA = types.Schema(
+    type="OBJECT",
+    properties={
+        "items": types.Schema(
+            type="ARRAY",
+            items=types.Schema(
+                type="OBJECT",
+                properties={
+                    "category": types.Schema(type="STRING", enum=_KNOWLEDGE_CATEGORIES),
+                    "title": types.Schema(type="STRING"),
+                    "price": types.Schema(type="STRING", nullable=True),
+                    "content_en": types.Schema(type="STRING", nullable=True),
+                    "content_km": types.Schema(type="STRING", nullable=True),
+                    "content_en_ai_generated": types.Schema(type="BOOLEAN"),
+                    "content_km_ai_generated": types.Schema(type="BOOLEAN"),
+                },
+                required=[
+                    "category",
+                    "title",
+                    "content_en_ai_generated",
+                    "content_km_ai_generated",
+                ],
+            ),
+        ),
+    },
+    required=["items"],
+)
+
+
+async def extract_knowledge_items(text: str) -> Optional[list[dict]]:
+    """Quick-add with AI: turn pasted raw text into draft knowledge items for
+    the owner to review — nothing is persisted here, this only returns drafts.
+
+    Returns None on failure (caller should surface a "could not analyze" error);
+    returns a possibly-empty list on success, capped at MAX_EXTRACT_ITEMS.
+    """
+    try:
+        response = await _client.aio.models.generate_content(
+            model=settings.ai_model,
+            contents=[types.Content(role="user", parts=[types.Part(text=text)])],
+            config=types.GenerateContentConfig(
+                system_instruction=_EXTRACT_INSTRUCTION,
+                response_mime_type="application/json",
+                response_schema=_EXTRACT_SCHEMA,
+            ),
+        )
+        items = json.loads(response.text)["items"]
+    except Exception:
+        logger.warning("Gemini knowledge extraction call failed", exc_info=True)
+        return None
+
+    cleaned = []
+    for item in items[:MAX_EXTRACT_ITEMS]:
+        if item.get("category") not in _KNOWLEDGE_CATEGORIES:
+            item["category"] = "other"
+        if not (item.get("content_en") or "").strip() and not (item.get("content_km") or "").strip():
+            continue
+        cleaned.append(item)
+    return cleaned
+
+
 def _build_system_instruction(business: Business, db: Session, handoff_active: bool) -> str:
     """Combine the shared personality rules with this business's tone,
     display name, and knowledge_items.

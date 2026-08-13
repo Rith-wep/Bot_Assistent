@@ -14,7 +14,7 @@
 
   /* Light content area — soft fresh-green tint (paler than accent-soft, so
      accent-soft badges/icon circles sitting on white cards still stand out) */
-  --color-page: #f0fdf4;
+  --color-page: #f7f8fa;
 
   /* Brand accent (fresh green) */
   --color-accent: #22c55e;
@@ -31,9 +31,27 @@
   /* Light-surface text */
   --color-ink: #111827;
   --color-ink-muted: #6b7280;
+  --color-landing-paper: #f0fdf4;
+  --color-landing-ink: #1e2130;
+  --color-landing-blue: #22c55e;
+  --color-landing-lime: #dcfce7;
 }
 
 body {
   font-family: var(--font-sans);
   background-color: var(--color-page);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
 }
+
+.landing-grid {
+  background-color: var(--color-landing-paper);
+  background-image: linear-gradient(rgba(30, 33, 48, .055) 1px, transparent 1px), linear-gradient(90deg, rgba(30, 33, 48, .055) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.landing-noise { background-image: radial-gradient(rgba(255,255,255,.18) .7px, transparent .7px); background-size: 7px 7px; }
+
+@keyframes landing-float { 0%, 100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-8px) rotate(0); } }
+.landing-float { animation: landing-float 6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .landing-float { animation: none; } }

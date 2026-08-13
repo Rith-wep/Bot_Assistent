@@ -72,16 +72,20 @@ export default function AppShell() {
     <Layout>
       <Suspense fallback={<RouteLoading />}>
         <Routes>
+          {/* Relative paths: this <Routes> is itself rendered inside a
+              parent <Route path="/app/*">, so paths here are matched
+              relative to "/app" — an absolute "/app/dashboard" here would
+              not match and silently render nothing. */}
           <Route
-            path="/app/signup"
+            path="signup"
             element={isAuthenticated ? <Navigate to="/app" replace /> : <SignUp />}
           />
           <Route
-            path="/app/signin"
+            path="signin"
             element={isAuthenticated ? <Navigate to="/app" replace /> : <SignIn />}
           />
           <Route
-            path="/app/onboarding"
+            path="onboarding"
             element={
               !isAuthenticated ? (
                 <Navigate to="/app/signin" replace />
@@ -93,7 +97,7 @@ export default function AppShell() {
             }
           />
           <Route
-            path="/app/dashboard"
+            path="dashboard"
             element={
               <Protected>
                 <Dashboard />
@@ -101,7 +105,7 @@ export default function AppShell() {
             }
           />
           <Route
-            path="/app/knowledge"
+            path="knowledge"
             element={
               <Protected>
                 <KnowledgeEditor />
@@ -109,7 +113,7 @@ export default function AppShell() {
             }
           />
           <Route
-            path="/app/leads"
+            path="leads"
             element={
               <Protected>
                 <Leads />
@@ -117,7 +121,7 @@ export default function AppShell() {
             }
           />
           <Route
-            path="/app/conversations"
+            path="conversations"
             element={
               <Protected>
                 <Conversations />
@@ -125,7 +129,7 @@ export default function AppShell() {
             }
           />
           <Route
-            path="/app/conversations/:id"
+            path="conversations/:id"
             element={
               <Protected>
                 <ConversationDetail />
@@ -133,7 +137,7 @@ export default function AppShell() {
             }
           />
           <Route
-            path="/app/settings"
+            path="settings"
             element={
               <Protected>
                 <SettingsPage />
@@ -141,7 +145,7 @@ export default function AppShell() {
             }
           />
           <Route
-            path="/app/admin"
+            path="admin"
             element={
               <Protected>
                 <Admin />
@@ -149,7 +153,7 @@ export default function AppShell() {
             }
           />
           <Route
-            path="/app"
+            index
             element={
               <Navigate
                 to={

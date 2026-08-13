@@ -1,21 +1,14 @@
-import { LayoutDashboard, BookOpen, Users, MessageSquare, Settings, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { APP_NAVIGATION } from "../config/navigation";
 import { useAuth } from "../context/AuthContext";
-
-const NAV_ITEMS = [
-  { to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: true },
-  { to: "/app/knowledge", label: "Knowledge", icon: BookOpen, enabled: true },
-  { to: "/app/leads", label: "Leads", icon: Users, enabled: true },
-  { to: "/app/conversations", label: "Conversations", icon: MessageSquare, enabled: true },
-  { to: "/app/settings", label: "Settings", icon: Settings, enabled: true },
-];
 
 function NavItems({ orientation }) {
   const isRow = orientation === "row";
   return (
     <>
-      {NAV_ITEMS.map(({ to, label, icon: Icon, enabled }) =>
-        enabled ? (
+      {APP_NAVIGATION.map(({ to, label, icon: Icon }) =>
+        (
           <NavLink
             key={to}
             to={to}
@@ -32,17 +25,6 @@ function NavItems({ orientation }) {
             <Icon className={isRow ? "h-5 w-5" : "h-[18px] w-[18px]"} strokeWidth={2} />
             {label}
           </NavLink>
-        ) : (
-          <span
-            key={to}
-            title="Coming soon"
-            className={`flex cursor-not-allowed items-center gap-3 rounded-lg font-medium text-shell-text-muted/40 ${
-              isRow ? "flex-col gap-1 px-3 py-1.5 text-[11px]" : "px-3 py-2 text-sm"
-            }`}
-          >
-            <Icon className={isRow ? "h-5 w-5" : "h-[18px] w-[18px]"} strokeWidth={2} />
-            {label}
-          </span>
         )
       )}
     </>

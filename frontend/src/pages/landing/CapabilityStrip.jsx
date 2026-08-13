@@ -10,12 +10,12 @@ const CAPABILITIES = [
 
 export default function CapabilityStrip() {
   return (
-    <section className="border-y border-white/10 bg-base py-8">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-8 gap-y-4 px-5 sm:px-8">
+    <section className="border-b border-landing-ink bg-landing-ink py-5">
+      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 px-6 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-8 sm:gap-y-4 sm:px-8">
         {CAPABILITIES.map(({ icon: Icon, label }) => (
           <div key={label} className="flex items-center gap-2">
-            <Icon className="h-4 w-4 text-accent" strokeWidth={2} />
-            <span className="text-sm font-medium text-shell-text-muted">{label}</span>
+            <Icon className="h-4 w-4 text-landing-lime" strokeWidth={2} />
+            <span className="text-sm font-semibold text-white/75">{label}</span>
           </div>
         ))}
       </div>

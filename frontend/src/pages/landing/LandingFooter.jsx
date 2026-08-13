@@ -2,11 +2,11 @@ import { Send } from "lucide-react";
 
 export default function LandingFooter() {
   return (
-    <footer className="bg-base py-10">
-      <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-5 text-center sm:flex-row sm:justify-between sm:text-left">
+    <footer className="landing-noise border-t-4 border-accent bg-landing-ink py-12">
+      <div className="mx-auto flex max-w-7xl flex-col items-center gap-5 px-5 text-center sm:flex-row sm:justify-between sm:text-left">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent font-heading text-xs font-extrabold text-white">
-            K
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-landing-lime font-heading text-sm font-extrabold text-landing-ink">
+            ខ
           </div>
           <span className="font-heading text-sm font-bold text-shell-text">Khmer Assistant</span>
         </div>

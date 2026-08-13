@@ -33,3 +33,21 @@ class KnowledgeItemOut(BaseModel):
     price: str | None
     sort_order: int
     updated_at: UtcDatetime
+
+
+class KnowledgeExtractRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=8000)
+
+
+class KnowledgeDraftItem(BaseModel):
+    category: KnowledgeCategory
+    title: str
+    content_km: str | None = None
+    content_en: str | None = None
+    price: str | None = None
+    content_km_ai_generated: bool = False
+    content_en_ai_generated: bool = False
+
+
+class KnowledgeExtractResponse(BaseModel):
+    items: list[KnowledgeDraftItem]

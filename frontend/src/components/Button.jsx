@@ -1,6 +1,6 @@
 const VARIANTS = {
   primary:
-    "bg-accent text-white hover:bg-accent-dark focus-visible:ring-accent shadow-sm",
+    "bg-accent-dark text-white hover:bg-accent-soft-text focus-visible:ring-accent shadow-sm",
   secondary:
     "border border-gray-300 bg-white text-ink hover:bg-gray-50 focus-visible:ring-accent",
   outline:
@@ -20,7 +20,7 @@ export default function Button({
   return (
     <button
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${className}`}
       {...props}
     >
       {children}

@@ -24,10 +24,11 @@ const STEPS = [
 
 export default function HowItWorks() {
   return (
-    <section className="bg-page py-20 sm:py-28">
+    <section className="landing-grid py-20 sm:py-28">
       <div className="mx-auto max-w-5xl px-5 sm:px-8">
         <div className="mx-auto max-w-lg text-center">
-          <h2 className="text-balance font-heading text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
+          <div className="mb-4 text-xs font-extrabold uppercase tracking-[0.18em] text-accent-dark">From zero to online</div>
+          <h2 className="text-balance font-heading text-3xl font-extrabold tracking-[-0.04em] text-landing-ink sm:text-5xl">
             Live in three steps.
           </h2>
           <p className="mt-3 text-sm text-ink-muted sm:text-base">
@@ -35,16 +36,16 @@ export default function HowItWorks() {
           </p>
         </div>
 
-        <div className="relative mt-14 grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-6">
+        <div className="relative mt-14 grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-7">
           {STEPS.map(({ number, icon: Icon, title, description }) => (
-            <div key={number} className="relative flex flex-col items-center text-center">
-              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-accent-soft">
+            <div key={number} className="relative flex flex-col items-center rounded-[1.75rem] border-2 border-landing-ink bg-white p-7 text-center shadow-[6px_7px_0_#1e2130]">
+              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-landing-lime">
                 <Icon className="h-7 w-7 text-accent-dark" strokeWidth={1.75} />
-                <span className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-base font-heading text-[10px] font-bold text-shell-text">
+                <span className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-landing-ink font-heading text-[10px] font-bold text-white">
                   {number}
                 </span>
               </div>
-              <h3 className="mt-5 font-heading font-bold text-ink">{title}</h3>
+              <h3 className="mt-5 font-heading font-extrabold text-landing-ink">{title}</h3>
               <p className="mt-1.5 max-w-[22ch] text-sm text-ink-muted">{description}</p>
             </div>
           ))}
@@ -53,7 +54,7 @@ export default function HowItWorks() {
         <div className="mt-14 text-center">
           <Link
             to="/app/signup"
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent-dark"
+            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3.5 text-sm font-bold text-white shadow-[4px_4px_0_#1e2130] transition-transform hover:-translate-y-0.5"
           >
             Start your free trial
           </Link>

@@ -1,8 +1,8 @@
 export default function EmptyState({ icon: Icon, title, description, action }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
+    <div className="flex flex-col items-center rounded-xl border border-gray-200 bg-white px-6 py-14 text-center shadow-sm">
       {Icon && (
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-accent/15 bg-accent-soft">
           <Icon className="h-6 w-6 text-accent-dark" strokeWidth={1.75} />
         </div>
       )}

@@ -22,11 +22,15 @@ const FAQS = [
     q: "How do I pay?",
     a: "You get a 30-day free trial with nothing to enter up front. Billing today is handled manually — no payment gateway yet — so we'll follow up directly to arrange payment before your trial ends.",
   },
+  {
+    q: "What if i want to cancel?",
+    a: "You can cancel anytime from Setting, and your subscription will end at the end of your current billing period. We don't do refunds"
+  }
 ];
 
 function FAQItem({ q, a, open, onToggle }) {
   return (
-    <div className="border-b border-gray-200 py-4">
+    <div className="mb-3 rounded-2xl border border-landing-ink/15 bg-white px-5 py-4 transition-colors hover:border-accent/50">
       <button
         onClick={onToggle}
         className="flex w-full items-center justify-between gap-4 text-left"
@@ -49,10 +53,11 @@ export default function FAQ() {
   const [openIndex, setOpenIndex] = useState(0);
 
   return (
-    <section className="bg-page py-20 sm:py-28">
+    <section className="landing-grid py-20 sm:py-28">
       <div className="mx-auto max-w-2xl px-5 sm:px-8">
         <div className="text-center">
-          <h2 className="text-balance font-heading text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
+          <div className="mb-4 text-xs font-extrabold uppercase tracking-[0.18em] text-accent-dark">Nothing hidden</div>
+          <h2 className="text-balance font-heading text-3xl font-extrabold tracking-[-0.04em] text-landing-ink sm:text-5xl">
             Questions owners actually ask.
           </h2>
         </div>

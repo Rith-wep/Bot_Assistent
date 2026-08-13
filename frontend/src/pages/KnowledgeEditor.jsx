@@ -1,8 +1,10 @@
-import { BookOpen, Pencil, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiFetch, ApiError } from "../api/client";
+import AiQuickAdd from "../components/AiQuickAdd";
 import Button from "../components/Button";
 import CategoryBadge from "../components/CategoryBadge";
+import ConfirmDialog from "../components/ConfirmDialog";
 import EmptyState from "../components/EmptyState";
 import KnowledgeItemForm, {
   EMPTY_KNOWLEDGE_FORM,
@@ -14,8 +16,9 @@ export default function KnowledgeEditor() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [addMode, setAddMode] = useState(null); // null | "ai" | "manual"
   const [editingId, setEditingId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   async function loadItems() {
     setLoading(true);
@@ -36,7 +39,12 @@ export default function KnowledgeEditor() {
 
   async function handleCreate(values) {
     await apiFetch("/knowledge", { method: "POST", body: values });
-    setShowAddForm(false);
+    setAddMode(null);
+    await loadItems();
+  }
+
+  async function handleAiSaved() {
+    setAddMode(null);
     await loadItems();
   }
 
@@ -47,9 +55,9 @@ export default function KnowledgeEditor() {
   }
 
   async function handleDelete(id) {
-    if (!confirm("Delete this knowledge item?")) return;
     try {
       await apiFetch(`/knowledge/${id}`, { method: "DELETE" });
+      setDeleteTarget(null);
       await loadItems();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not delete item.");
@@ -62,11 +70,17 @@ export default function KnowledgeEditor() {
         title="Knowledge"
         description="What your assistant knows and answers customers with."
         action={
-          !showAddForm && (
-            <Button onClick={() => setShowAddForm(true)}>
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
-              Add item
-            </Button>
+          !addMode && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setAddMode("manual")}>
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+                Add item
+              </Button>
+              <Button onClick={() => setAddMode("ai")}>
+                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+                Add with AI
+              </Button>
+            </div>
           )
         }
       />
@@ -75,34 +89,46 @@ export default function KnowledgeEditor() {
         <p className="mb-4 rounded-lg bg-error-soft px-3 py-2 text-sm text-error">{error}</p>
       )}
 
-      {showAddForm && (
+      {addMode === "manual" && (
         <div className="mb-6">
           <KnowledgeItemForm
             initial={EMPTY_KNOWLEDGE_FORM}
             submitLabel="Add"
             onSubmit={handleCreate}
-            onCancel={() => setShowAddForm(false)}
+            onCancel={() => setAddMode(null)}
           />
+        </div>
+      )}
+
+      {addMode === "ai" && (
+        <div className="mb-6">
+          <AiQuickAdd onSaved={handleAiSaved} onCancel={() => setAddMode(null)} autoFocus />
         </div>
       )}
 
       {loading ? (
         <KnowledgeListSkeleton />
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && !addMode ? (
         <EmptyState
           icon={BookOpen}
           title="No knowledge items yet"
-          description="Add your services, hours, location, and FAQs so your assistant can answer customers accurately."
+          description="Paste your price list — AI will do the typing. Or add items one at a time."
           action={
-            !showAddForm && (
-              <Button onClick={() => setShowAddForm(true)}>
-                <Plus className="h-4 w-4" strokeWidth={2.5} />
-                Add your first item
+            <div className="flex flex-col items-center gap-2">
+              <Button onClick={() => setAddMode("ai")}>
+                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+                Add with AI
               </Button>
-            )
+              <button
+                onClick={() => setAddMode("manual")}
+                className="text-sm font-medium text-ink-muted transition-colors duration-150 hover:text-ink"
+              >
+                or add manually
+              </button>
+            </div>
           }
         />
-      ) : (
+      ) : items.length > 0 ? (
         <div className="space-y-3">
           {items.map((item) =>
             editingId === item.id ? (
@@ -152,7 +178,7 @@ export default function KnowledgeEditor() {
                       <Pencil className="h-4 w-4" strokeWidth={2} />
                     </button>
                     <button
-                      onClick={() => handleDelete(item.id)}
+                      onClick={() => setDeleteTarget(item)}
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-error-soft hover:text-error"
                       aria-label="Delete"
                     >
@@ -164,7 +190,19 @@ export default function KnowledgeEditor() {
             )
           )}
         </div>
-      )}
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => handleDelete(deleteTarget.id)}
+        title="Delete this knowledge item?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.title}" will be permanently removed and your assistant will no longer use it to answer customers.`
+            : ""
+        }
+      />
     </div>
   );
 }

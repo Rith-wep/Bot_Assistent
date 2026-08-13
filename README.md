@@ -6,11 +6,9 @@ build order this project follows.
 
 - **v2 (this repo root)** — FastAPI backend (`app/`), Alembic migrations
   (`alembic/`), React dashboard (`frontend/`).
-- **v1 (working reference)** — [v1_legacy/](v1_legacy/): the original single-tenant
-  Telegram bot this project was refactored from. Still runnable as-is; see
-  [v1_legacy/Readme.md](v1_legacy/Readme.md). The multi-tenant `app/` code below
-  ports v1's bot logic (Khmer replies, lead capture, human handoff, memory,
-  error handling) onto Postgres, scoped by `business_id`.
+The current application preserves the original bot behavior (Khmer replies,
+lead capture, human handoff, memory, and error handling) on a multi-tenant
+Postgres architecture scoped by `business_id`.
 
 ## Status
 
@@ -40,7 +38,6 @@ alembic/                 # DB migrations
 frontend/                  # React dashboard (SPA, Vite + Tailwind v4)
 prompts/                      # shared system prompt used by the AI service
 scripts/                        # one-off/import/seed scripts
-v1_legacy/                        # original v1 bot, kept working for reference
 ```
 
 ## Backend
@@ -218,6 +215,8 @@ matching the business's `onboarding_step`:
    against the real prompt + knowledge, then `go-live` and redirect to the
    dashboard.
 
+## for the professional dashboard 
+
 ### Settings sections (`pages/settings/`)
 
 `ProfileSection`, `TelegramSection` (connect/disconnect), `AdminsSection`
@@ -237,12 +236,10 @@ separate component.
 
 ## Scripts (`scripts/`)
 
-- **`import_v1_client.py`** — one-time import of a v1 client's
-  `business_info.md` and `leads.json` into the v2 `knowledge_items`/`leads`
-  tables.
-- **`verify_import.py`** — sanity-checks an import ran correctly.
 - **`seed_test_business.py`** — creates a throwaway business + user for local
   testing.
+- **`seed_demo_business.py`** — creates the fictional business used by the
+  public live demo.
 
 ## Running locally
 

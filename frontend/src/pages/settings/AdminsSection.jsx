@@ -1,7 +1,8 @@
-import { Send, Trash2, UserPlus } from "lucide-react";
+import { Send, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiFetch, ApiError } from "../../api/client";
 import Button from "../../components/Button";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import SectionCard from "../../components/SectionCard";
 import { formatDate } from "../../utils/format";
 
@@ -11,6 +12,7 @@ export default function AdminsSection({ notifications, telegramConnected, onNoti
   const [inviting, setInviting] = useState(false);
   const [prefs, setPrefs] = useState(notifications);
   const [savingPrefs, setSavingPrefs] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState(null);
 
   async function loadAdmins() {
     setLoading(true);
@@ -43,10 +45,10 @@ export default function AdminsSection({ notifications, telegramConnected, onNoti
   }
 
   async function handleRemove(id) {
-    if (!confirm("Remove this admin? They'll stop receiving notifications.")) return;
     try {
       await apiFetch(`/admins/${id}`, { method: "DELETE" });
       setAdmins((a) => a.filter((x) => x.id !== id));
+      setRemoveTarget(null);
       showToast("Admin removed");
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : "Could not remove admin.", "error");
@@ -99,7 +101,7 @@ export default function AdminsSection({ notifications, telegramConnected, onNoti
                 <p className="text-xs text-ink-muted">Connected {formatDate(admin.connected_at)}</p>
               </div>
               <button
-                onClick={() => handleRemove(admin.id)}
+                onClick={() => setRemoveTarget(admin)}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-error-soft hover:text-error"
                 aria-label="Remove admin"
               >
@@ -133,6 +135,19 @@ export default function AdminsSection({ notifications, telegramConnected, onNoti
           {savingPrefs ? "Saving..." : "Save"}
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(removeTarget)}
+        onClose={() => setRemoveTarget(null)}
+        onConfirm={() => handleRemove(removeTarget.id)}
+        title="Remove this admin?"
+        description={
+          removeTarget
+            ? `${removeTarget.name || "This admin"} will stop receiving notifications.`
+            : ""
+        }
+        confirmLabel="Remove"
+      />
     </SectionCard>
   );
 }

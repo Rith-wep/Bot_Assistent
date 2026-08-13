@@ -15,7 +15,7 @@ export default function Landing() {
   }, []);
 
   return (
-    <div className="bg-base">
+    <div className="overflow-hidden bg-landing-paper text-landing-ink">
       <LandingNav />
       <Hero />
       <LiveDemo />

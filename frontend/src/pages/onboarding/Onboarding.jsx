@@ -1,16 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { apiFetch, ApiError } from "../../api/client";
 import Stepper from "../../components/Stepper";
-import { useAuth } from "../../context/AuthContext";
 import Step1Basics from "./Step1Basics";
 import Step2Knowledge from "./Step2Knowledge";
 import Step3Telegram from "./Step3Telegram";
 import Step4GoLive from "./Step4GoLive";
 
 export default function Onboarding() {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,11 +25,6 @@ export default function Onboarding() {
   useEffect(() => {
     loadStatus();
   }, []);
-
-  function handleSignOut() {
-    logout();
-    navigate("/app/signin");
-  }
 
   if (loading) {
     return (
@@ -57,28 +48,26 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-page">
-      <header className="flex items-center justify-between px-4 py-4 sm:px-8">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent font-heading text-sm font-extrabold text-white">
-            K
+      <header className="border-b border-gray-200 bg-white">
+        <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center px-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent font-heading text-sm font-extrabold text-white">
+              K
+            </div>
+            <span className="truncate font-heading text-sm font-bold text-ink">Set up your assistant</span>
           </div>
-          <span className="font-heading text-sm font-bold text-ink">Set up your assistant</span>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="text-sm font-medium text-ink-muted transition-colors duration-150 hover:text-ink"
-        >
-          Sign out
-        </button>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 pb-16 sm:px-6">
+      <main className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8 lg:px-8">
         <Stepper currentStep={step} />
 
+        <div className={step === 4 ? "w-full" : "mx-auto w-full max-w-2xl"}>
         {step === 1 && <Step1Basics status={status} onAdvance={loadStatus} />}
         {step === 2 && <Step2Knowledge status={status} onAdvance={loadStatus} />}
         {step === 3 && <Step3Telegram status={status} onAdvance={loadStatus} />}
         {step === 4 && <Step4GoLive status={status} onAdvance={loadStatus} />}
+        </div>
       </main>
     </div>
   );

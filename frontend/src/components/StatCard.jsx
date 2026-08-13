@@ -15,7 +15,7 @@ export default function StatCard({
 
   return (
     <div
-      className={`rounded-xl border border-gray-200 bg-white p-5 lg:p-4 ${muted ? "opacity-60" : ""}`}
+      className={`rounded-xl border border-gray-200 bg-white p-5 shadow-sm ${muted ? "opacity-60" : ""}`}
     >
       <div className="flex items-center gap-2 text-ink-muted">
         <Icon className="h-4 w-4" strokeWidth={2} />

@@ -2,6 +2,7 @@ import { CheckCircle2, Copy, ExternalLink, XCircle } from "lucide-react";
 import { useState } from "react";
 import { apiFetch, ApiError } from "../../api/client";
 import Button from "../../components/Button";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import SectionCard from "../../components/SectionCard";
 import { formatDate } from "../../utils/format";
 
@@ -12,6 +13,7 @@ export default function TelegramSection({ telegram, onSaved, showToast }) {
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 
   async function handleValidate() {
     setValidation(null);
@@ -46,9 +48,6 @@ export default function TelegramSection({ telegram, onSaved, showToast }) {
   }
 
   async function handleDisconnect() {
-    if (!confirm("Disconnect this bot? Customers won't be able to reach your assistant until you connect a new one.")) {
-      return;
-    }
     setDisconnecting(true);
     try {
       const updated = await apiFetch("/settings/telegram/disconnect", { method: "POST" });
@@ -58,6 +57,7 @@ export default function TelegramSection({ telegram, onSaved, showToast }) {
       showToast(err instanceof ApiError ? err.message : "Could not disconnect.", "error");
     } finally {
       setDisconnecting(false);
+      setConfirmingDisconnect(false);
     }
   }
 
@@ -97,9 +97,18 @@ export default function TelegramSection({ telegram, onSaved, showToast }) {
           </p>
         )}
 
-        <Button variant="destructive" onClick={handleDisconnect} disabled={disconnecting}>
+        <Button variant="destructive" onClick={() => setConfirmingDisconnect(true)} disabled={disconnecting}>
           {disconnecting ? "Disconnecting..." : "Disconnect"}
         </Button>
+
+        <ConfirmDialog
+          open={confirmingDisconnect}
+          onClose={() => setConfirmingDisconnect(false)}
+          onConfirm={handleDisconnect}
+          title="Disconnect this bot?"
+          description="Customers won't be able to reach your assistant until you connect a new one."
+          confirmLabel="Disconnect"
+        />
       </SectionCard>
     );
   }

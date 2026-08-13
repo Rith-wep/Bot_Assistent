@@ -1,19 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import (
-    admin_console,
-    admins,
-    auth,
-    conversations,
-    dashboard,
-    demo,
-    gaps,
-    knowledge,
-    leads,
-    onboarding,
-    settings,
-)
+from app.api.router import api_router
 
 app = FastAPI(title="Khmer AI Customer Assistant")
 
@@ -25,17 +13,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
-app.include_router(onboarding.router)
-app.include_router(dashboard.router)
-app.include_router(knowledge.router)
-app.include_router(leads.router)
-app.include_router(conversations.router)
-app.include_router(settings.router)
-app.include_router(admins.router)
-app.include_router(gaps.router)
-app.include_router(admin_console.router)
-app.include_router(demo.router)
+app.include_router(api_router)
 
 
 @app.get("/health")

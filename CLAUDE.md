@@ -2,16 +2,26 @@
 
 ## What this project is
 
-The multi-tenant SaaS evolution of a working v1 product: an AI customer assistant
-(Telegram bot) for small businesses in Cambodia. In v1, one deployment served one
-business, configured through files. In v2, ONE system serves MANY businesses:
+The multi-tenant SaaS evolution of an original single-tenant product: an AI
+customer assistant (Telegram bot) for small businesses in Cambodia. The legacy
+source has been retired from this repository. The current system serves MANY businesses:
 each business signs up on a web dashboard, registers its own information through
 an onboarding wizard, connects its own Telegram bot, and manages everything
 self-service — its AI assistant, its leads, its conversations, its settings.
 
-The v1 codebase already works and contains the proven bot logic (Khmer replies,
-lead capture, human handoff, memory, error handling, logging). v2 refactors that
-logic into a multi-tenant engine and adds the web platform around it.
+The current code preserves the proven bot behavior (Khmer replies, lead capture,
+human handoff, memory, error handling, and logging) in a multi-tenant engine with
+a self-service web platform.
+
+## Current implementation status
+
+Core build steps 1-7 are implemented. Weekly Intelligence parts 1-5 and the
+AI-assisted knowledge import are also implemented. The internal admin page is a
+read-only business list with status, plan, open-gap count, and last-summary time;
+mark-paid and pause-account actions are not implemented. Dashboard headline
+metrics and chart data remain partly mocked. Railway deployment is not yet
+configured. Facebook Messenger and payment-gateway integration remain out of
+scope.
 
 ## The golden rule: tenant isolation
 
@@ -175,7 +185,7 @@ running them twice is always safe.
   open cluster count and last summary sent time. Build only the minimum
   needed for that page to exist (list businesses + these two fields) rather
   than its full eventual scope, unless the full page is separately
-  requested — it is not built yet as of this feature's start.
+  requested. This minimum read-only page is now implemented.
 
 ### Build order for this feature (separate from the core build order —
 ### stop for confirmation after each part, same rule as below)
@@ -195,6 +205,45 @@ afterward, cluster resolves), dismissal, the weekly summary (manual trigger,
 no double-send for the same week), and tenant isolation (business A must
 never see business B's clusters or questions).
 
+## AI-assisted knowledge import ("Quick add with AI")
+
+An alternative to the manual knowledge_items form: the owner pastes raw
+unstructured text (a price list, Facebook About text, a menu, rough notes —
+Khmer, English, or mixed) and the AI module turns it into draft knowledge
+items for review, instead of the owner retyping everything by hand.
+
+**Flow:** owner pastes text into a large textarea and hits Analyze → backend
+sends it to the same provider-agnostic AI module (no new AI dependency) with
+an extraction prompt → returns a list of draft items → owner reviews them as
+editable cards, edits or deletes any, then "Add all" / "Add selected" →
+only then are they persisted as real knowledge_items. Nothing is saved
+until the owner confirms — same "never surprise the owner" principle as the
+Gaps fix flow.
+
+- **Endpoint:** `POST /api/knowledge/ai-extract`, tenant-scoped like every
+  other knowledge endpoint (business_id from the authenticated user).
+  Input capped (8000 chars), output capped (40 items), rate-limited
+  per-business (in-process sliding window, same pattern as the demo
+  endpoint's IP-keyed limiter — no new infra).
+- **Extraction:** category (service/faq/hours/location/policy/other), title,
+  price (normalized, e.g. `$15` or `$20 - $40`), content_en, content_km.
+  Never invent a service, price, hours, or location not present in the
+  source text — if hours/location aren't mentioned, no such item is
+  produced. When the source only covers one language for an item, the
+  other language is drafted naturally (same polite register as the bot's
+  voice) and flagged `content_en_ai_generated` / `content_km_ai_generated`
+  so the review UI can show an "AI-drafted" chip. These flags are only
+  used in the review step — they are not persisted on knowledge_items.
+- **Review UI:** shared `AiQuickAdd` component
+  (`frontend/src/components/AiQuickAdd.jsx`), used on both the Knowledge
+  page and onboarding step 2 — draft cards with inline-editable fields, a
+  checkbox to include/exclude each card, a delete button per card, and
+  "AI-drafted" chips on generated translations.
+- **Empty-state nudge:** when a business has few/no knowledge items, both
+  the Knowledge page and onboarding step 2 present "Add with AI" as the
+  primary path (manual form/suggestions as secondary), per the design
+  system below.
+
 ## Frontend design system — "fresh green on deep slate"
 
 Applies to every page, present and future (Dashboard, Leads, Conversations,
@@ -206,9 +255,8 @@ components; use the token classes (`bg-base`, `text-accent`, etc.).
 section):**
 - `bg-base` (#1E2130) — dark shell: sidebar, auth pages.
 - `bg-surface` (#282C3E) — cards/panels/inputs on the dark shell.
-- `bg-page` (#F0FDF4) — light main content area background, a soft fresh-green
-  tint. Deliberately paler than `accent-soft` so accent-soft badges/icon
-  circles on white cards still stand out against it.
+- `bg-page` (#F7F8FA) — neutral application workspace background. Green is
+  reserved for actions, status, and emphasis rather than large app surfaces.
 - `accent` (#22C55E) / `accent-dark` (#16A34A hover) / `accent-soft`
   (#DCFCE7 tint) — primary buttons, active nav item, prices, key stats.
 - `warning` (amber, #F59E0B) and `error` (red, #EF4444) — the only other
@@ -233,7 +281,10 @@ white, `rounded-xl`, subtle border/shadow, consistent padding.
 than re-styling inline: `Button` (variants: primary/secondary/destructive/
 ghost), `CategoryBadge` (colored chips), `PageHeader`, `EmptyState`
 (icon + message + CTA, never bare gray text), `Skeleton` (loading
-placeholders — no spinners), `Sidebar`, `Layout`.
+placeholders — no spinners), `Sidebar`, `Layout`, `Modal` /
+`ConfirmDialog` (on-brand confirm popup — never the native
+`window.confirm`), `AiQuickAdd` (paste-to-draft-knowledge review flow,
+see AI-assisted knowledge import above).
 
 **Polish rules:** generous whitespace, consistent spacing scale, every
 interactive element has a hover/focus state, transitions are 150–200ms
@@ -264,24 +315,24 @@ the heading font, not visual effects.
 6. **Knowledge editor** — CRUD on knowledge_items; changes take effect on the
    next customer message (no restart needed).
 7. **Settings** — bot connection status, pause/resume bot, business profile,
-   plan display. Billing is MANUAL in v2: an admin (me) marks a business as
-   paid; the UI only shows plan + status. No payment gateway yet.
-8. **Internal admin page** (just for me): list businesses, status, mark paid,
-   pause account. Also shows, per business, open Weekly Intelligence cluster
-   count and last weekly-summary-sent time (see Weekly Intelligence above).
+   and plan display. Billing remains manual; there is currently no payment
+   gateway or admin action for changing payment state.
+8. **Internal admin page**: the current read-only implementation lists
+   businesses, status, plan, open Weekly Intelligence cluster count, and last
+   weekly-summary-sent time. Mark-paid and pause-account actions are future work.
 
 ## API design conventions
 
 - REST endpoints under /api, all tenant endpoints derive business_id from the
   authenticated user — NEVER from a client-supplied parameter.
 - Validation on all inputs; consistent error responses.
-- Auth required on everything except signup/signin.
+- Auth required on everything except signup, signin, health checks, and the
+  rate-limited public demo chat endpoint.
 
 ## Build order (strict — one step at a time, test before next)
 
-1. **Database + migration**: schema above, Alembic set up, plus a one-time
-   script that imports my current v1 client (business info file → knowledge
-   rows, existing leads file → leads table).
+1. **Database + migration**: schema above and Alembic migrations. The historical
+   v1 import utility has been retired along with the legacy source tree.
 2. **Engine on DB**: v1 bot logic refactored to read knowledge/config from
    Postgres and write conversations/leads to it. Still ONE business. Verify
    identical behavior to v1 (same test script as v1 steps 3–6).
