@@ -28,6 +28,8 @@ const LEGACY_APP_PATHS = [
   "/admin",
   "/signin",
   "/signup",
+  "/forgot-password",
+  "/reset-password",
   "/onboarding",
 ];
 

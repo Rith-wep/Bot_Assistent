@@ -11,7 +11,7 @@ import ProblemSolution from "./ProblemSolution";
 
 export default function Landing() {
   useEffect(() => {
-    document.title = "Khmer Assistant — A receptionist that never sleeps";
+    document.title = "WeCare — A receptionist that never sleeps";
   }, []);
 
   return (

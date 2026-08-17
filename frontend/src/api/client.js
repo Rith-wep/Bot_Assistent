@@ -1,16 +1,4 @@
-const TOKEN_KEY = "access_token";
-
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
-}
+import { getSupabase } from "../lib/supabase";
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -19,12 +7,22 @@ export class ApiError extends Error {
   }
 }
 
+async function authHeaders() {
+  const {
+    data: { session },
+    error,
+  } = await getSupabase().auth.getSession();
+  if (error || !session?.access_token) return {};
+  return { Authorization: `Bearer ${session.access_token}` };
+}
+
+function notifyUnauthorized() {
+  window.dispatchEvent(new Event("auth:unauthorized"));
+}
+
 export async function apiFetch(path, { method = "GET", body, auth = true } = {}) {
   const headers = { "Content-Type": "application/json" };
-  if (auth) {
-    const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
+  if (auth) Object.assign(headers, await authHeaders());
 
   const response = await fetch(`/api${path}`, {
     method,
@@ -38,10 +36,11 @@ export async function apiFetch(path, { method = "GET", body, auth = true } = {})
   try {
     data = await response.json();
   } catch {
-    // no JSON body
+    // The API may return no JSON body for infrastructure-level failures.
   }
 
   if (!response.ok) {
+    if (auth && response.status === 401) notifyUnauthorized();
     const message = data?.detail || `Request failed (${response.status})`;
     throw new ApiError(message, response.status);
   }
@@ -50,12 +49,9 @@ export async function apiFetch(path, { method = "GET", body, auth = true } = {})
 }
 
 export async function downloadFile(path, filename) {
-  const headers = {};
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const response = await fetch(`/api${path}`, { headers });
+  const response = await fetch(`/api${path}`, { headers: await authHeaders() });
   if (!response.ok) {
+    if (response.status === 401) notifyUnauthorized();
     throw new ApiError(`Download failed (${response.status})`, response.status);
   }
   const blob = await response.blob();

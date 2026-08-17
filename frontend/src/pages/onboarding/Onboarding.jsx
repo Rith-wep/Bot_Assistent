@@ -5,6 +5,7 @@ import Step1Basics from "./Step1Basics";
 import Step2Knowledge from "./Step2Knowledge";
 import Step3Telegram from "./Step3Telegram";
 import Step4GoLive from "./Step4GoLive";
+import Logo from "../../components/Logo";
 
 export default function Onboarding() {
   const [status, setStatus] = useState(null);
@@ -50,11 +51,9 @@ export default function Onboarding() {
     <div className="min-h-screen bg-page">
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center px-4 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent font-heading text-sm font-extrabold text-white">
-              K
-            </div>
-            <span className="truncate font-heading text-sm font-bold text-ink">Set up your assistant</span>
+          <div className="flex min-w-0 items-center gap-3 rounded-xl border border-gray-400 bg-gray-300 px-4 py-2 shadow-md">
+            <Logo className="h-14 w-24 shrink-0" />
+            <span className="truncate font-sans text-base font-bold text-slate-700">Set up your assistant</span>
           </div>
         </div>
       </header>

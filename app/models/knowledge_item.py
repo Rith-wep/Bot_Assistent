@@ -28,6 +28,7 @@ class KnowledgeItem(Base):
     category: Mapped[KnowledgeCategory] = mapped_column(
         Enum(KnowledgeCategory, name="knowledge_category"), nullable=False
     )
+    
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content_km: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_en: Mapped[str | None] = mapped_column(Text, nullable=True)

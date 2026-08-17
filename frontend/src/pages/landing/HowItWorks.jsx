@@ -1,22 +1,18 @@
-import { BookOpenCheck, Send, UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const STEPS = [
   {
     number: "01",
-    icon: UserPlus,
     title: "Sign up",
     description: "Create your account in under a minute — no credit card needed.",
   },
   {
     number: "02",
-    icon: BookOpenCheck,
     title: "Add your business info",
     description: "Services, prices, hours, location, FAQs — a guided wizard walks you through it.",
   },
   {
     number: "03",
-    icon: Send,
     title: "Connect your Telegram bot",
     description: "Paste one token from @BotFather and you're live — customers can message you immediately.",
   },
@@ -37,15 +33,10 @@ export default function HowItWorks() {
         </div>
 
         <div className="relative mt-14 grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-7">
-          {STEPS.map(({ number, icon: Icon, title, description }) => (
-            <div key={number} className="relative flex flex-col items-center rounded-[1.75rem] border-2 border-landing-ink bg-white p-7 text-center shadow-[6px_7px_0_#1e2130]">
-              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-landing-lime">
-                <Icon className="h-7 w-7 text-accent-dark" strokeWidth={1.75} />
-                <span className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-landing-ink font-heading text-[10px] font-bold text-white">
-                  {number}
-                </span>
-              </div>
-              <h3 className="mt-5 font-heading font-extrabold text-landing-ink">{title}</h3>
+          {STEPS.map(({ number, title, description }) => (
+            <div key={number} className="relative flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-md">
+              <span className="text-sm font-bold text-accent-dark">Step {number}</span>
+              <h3 className="mt-3 font-heading font-extrabold text-landing-ink">{title}</h3>
               <p className="mt-1.5 max-w-[22ch] text-sm text-ink-muted">{description}</p>
             </div>
           ))}

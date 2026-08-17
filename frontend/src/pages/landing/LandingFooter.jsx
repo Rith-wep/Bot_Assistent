@@ -1,14 +1,16 @@
 import { Send } from "lucide-react";
+import Logo from "../../components/Logo";
 
 export default function LandingFooter() {
   return (
     <footer className="landing-noise border-t-4 border-accent bg-landing-ink py-12">
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-5 px-5 text-center sm:flex-row sm:justify-between sm:text-left">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-landing-lime font-heading text-sm font-extrabold text-landing-ink">
-            ខ
-          </div>
-          <span className="font-heading text-sm font-bold text-shell-text">Khmer Assistant</span>
+        <div className="flex items-center gap-3 rounded-2xl border border-gray-300 bg-white px-4 py-2.5 shadow-md">
+          <Logo className="h-16 w-28" />
+          <span className="font-sans text-2xl font-bold tracking-tight">
+            <span className="text-accent">We</span>
+            <span className="text-slate-500">Care</span>
+          </span>
         </div>
 
         {/* TODO: replace with the real company support Telegram handle before launch */}
@@ -23,7 +25,7 @@ export default function LandingFooter() {
         </a>
 
         <p className="text-xs text-shell-text-muted">
-          &copy; {new Date().getFullYear()} Khmer Assistant. All rights reserved.
+          &copy; {new Date().getFullYear()} WeCare. All rights reserved.
         </p>
       </div>
     </footer>

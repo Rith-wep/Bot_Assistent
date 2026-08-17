@@ -1,35 +1,39 @@
-from datetime import datetime, timedelta, timezone
-
-import bcrypt
 import jwt
+from jwt import PyJWKClient
 from cryptography.fernet import Fernet
 
 from app.core.config import settings
 
 _fernet = Fernet(settings.encryption_key.encode())
 
-JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
+_supabase_jwks_client: PyJWKClient | None = None
 
 
-def hash_password(plain_password: str) -> str:
-    return bcrypt.hashpw(plain_password.encode(), bcrypt.gensalt()).decode()
+def decode_supabase_access_token(token: str) -> dict:
+    """Validate a Supabase access token against the project's public JWKS.
 
+    Signature, issuer, audience and expiration are all mandatory. Public keys
+    are cached by PyJWKClient; no Supabase secret key is needed by the API.
+    """
+    global _supabase_jwks_client
 
-def verify_password(plain_password: str, password_hash: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode(), password_hash.encode())
+    issuer = settings.supabase_issuer
+    if _supabase_jwks_client is None:
+        _supabase_jwks_client = PyJWKClient(
+            f"{issuer}/.well-known/jwks.json",
+            cache_keys=True,
+            lifespan=600,
+        )
 
-
-def create_access_token(user_id: int, business_id: int) -> str:
-    # jwt.encode needs a timezone-aware "exp", unlike the naive-UTC convention
-    # used elsewhere (app.core.time.utcnow) for DB columns.
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(user_id), "business_id": business_id, "exp": expire}
-    return jwt.encode(payload, settings.secret_key, algorithm=JWT_ALGORITHM)
-
-
-def decode_access_token(token: str) -> dict:
-    return jwt.decode(token, settings.secret_key, algorithms=[JWT_ALGORITHM])
+    signing_key = _supabase_jwks_client.get_signing_key_from_jwt(token)
+    return jwt.decode(
+        token,
+        signing_key.key,
+        algorithms=["RS256", "ES256"],
+        audience="authenticated",
+        issuer=issuer,
+        options={"require": ["exp", "iss", "sub", "aud"]},
+    )
 
 
 def encrypt_secret(plain_text: str) -> str:

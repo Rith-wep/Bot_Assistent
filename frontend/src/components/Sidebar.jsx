@@ -2,6 +2,7 @@ import { LogOut } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { APP_NAVIGATION } from "../config/navigation";
 import { useAuth } from "../context/AuthContext";
+import Logo from "./Logo";
 
 function NavItems({ orientation }) {
   const isRow = orientation === "row";
@@ -38,13 +39,18 @@ export default function Sidebar() {
     <>
       {/* Desktop rail */}
       <aside className="hidden w-60 shrink-0 flex-col bg-base sm:flex">
-        <div className="flex h-16 items-center gap-2 px-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent font-heading text-sm font-extrabold text-white">
-            K
-          </div>
-          <span className="truncate font-heading text-sm font-bold text-shell-text">
-            {businessName || "Khmer Assistant"}
-          </span>
+        <div className="mx-3 mt-2 flex min-h-16 items-center gap-2 rounded-xl border border-gray-400 bg-gray-300 px-2.5 py-2 shadow-md">
+          <Logo className="h-12 w-16 shrink-0" />
+          {businessName ? (
+            <span className="truncate font-sans text-base font-bold text-slate-700">
+              {businessName}
+            </span>
+          ) : (
+            <span className="font-sans text-xl font-bold tracking-tight">
+              <span className="text-accent">We</span>
+              <span className="text-slate-500">Care</span>
+            </span>
+          )}
         </div>
         <nav className="flex-1 space-y-1 px-3 py-2">
           <NavItems orientation="col" />

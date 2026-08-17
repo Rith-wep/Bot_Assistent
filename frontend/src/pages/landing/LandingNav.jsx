@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import Logo from "../../components/Logo";
 
 export default function LandingNav() {
   function scrollToDemo(e) {
@@ -10,33 +11,37 @@ export default function LandingNav() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-landing-ink/10 bg-landing-paper/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-green-700 bg-green-500 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:px-8 sm:py-4">
-        <a href="#top" className="flex items-center gap-2">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-landing-ink font-heading text-sm font-extrabold text-landing-lime">
-            ខ
-            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-landing-paper bg-accent" />
-          </div>
-          <span className="hidden font-heading text-sm font-extrabold tracking-tight text-landing-ink min-[420px]:inline">Khmer Assistant</span>
+        <a
+          href="#top"
+          className="flex items-center gap-1 rounded-xl border border-gray-300 bg-white px-1.5 py-1 shadow-md sm:gap-2 sm:px-3 sm:py-1.5"
+          aria-label="WeCare home"
+        >
+          <Logo className="h-9 w-14 sm:h-12 sm:w-20" />
+          <span className="font-sans text-lg font-bold tracking-tight sm:text-2xl">
+            <span className="text-accent">We</span>
+            <span className="text-slate-500">Care</span>
+          </span>
         </a>
 
-        <div className="flex shrink-0 items-center gap-0.5 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <a
             href="#demo"
             onClick={scrollToDemo}
-            className="hidden rounded-full px-3.5 py-2 text-sm font-semibold text-landing-ink/60 transition-colors hover:text-landing-ink sm:block"
+            className="hidden h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white transition-colors hover:bg-green-600 sm:inline-flex"
           >
             Live demo
           </a>
           <Link
             to="/app/signin"
-            className="rounded-full px-2.5 py-2 text-xs font-semibold text-landing-ink/60 transition-colors hover:text-landing-ink sm:px-3.5 sm:text-sm"
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-white/80 bg-white px-3 text-xs font-semibold text-green-700 shadow-sm transition-colors hover:bg-green-50 sm:px-4 sm:text-sm"
           >
             Sign in
           </Link>
           <Link
             to="/app/signup"
-            className="rounded-full bg-landing-ink px-3 py-2 text-xs font-semibold text-white transition-transform hover:-translate-y-0.5 sm:px-4 sm:text-sm"
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 sm:px-5 sm:text-sm"
           >
             Start free trial
           </Link>

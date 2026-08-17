@@ -13,7 +13,7 @@ if config.config_file_name is not None:
 
 # Set directly on the engine, not via config.set_main_option: that goes through
 # configparser interpolation, which chokes on a "%"-containing URL-encoded password.
-DATABASE_URL = settings.database_url
+DATABASE_URL = settings.migration_database_url or settings.database_url
 
 target_metadata = Base.metadata
 

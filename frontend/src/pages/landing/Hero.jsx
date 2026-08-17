@@ -15,21 +15,21 @@ export default function Hero() {
       <div className="pointer-events-none absolute -left-28 top-24 h-72 w-72 rounded-full bg-landing-lime/70 blur-3xl" />
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-12 sm:px-8 sm:pt-24 lg:grid-cols-[1.05fr_.95fr] lg:py-28">
         <div>
-          <div className="mb-6 inline-flex max-w-full -rotate-1 items-center gap-2 rounded-full border border-landing-ink bg-landing-lime px-3 py-2 shadow-[3px_3px_0_#1e2130] sm:px-4">
-            <Sparkles className="h-3.5 w-3.5" />
+          <div className="mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 shadow-sm sm:px-4">
+            {/* <Sparkles className="h-3.5 w-3.5" /> */}
             <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] sm:text-xs sm:tracking-[0.14em]">Built for Cambodian businesses</span>
           </div>
           <h1 className="max-w-3xl text-balance font-heading text-4xl font-extrabold leading-[1.02] tracking-[-0.05em] text-landing-ink min-[390px]:text-5xl sm:text-7xl">
-            Every message becomes a <span className="text-landing-blue">business chance.</span>
+            Every message becomes a <span className="hero-accent-outline text-landing-blue">business chance.</span>
           </h1>
           <p className="mt-7 max-w-xl text-balance text-base leading-7 text-landing-ink/65 sm:text-lg">
             Your always-on AI front desk speaks Khmer, English, and Chinese, answers instantly, and sends qualified leads straight to your phone.
           </p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <a href="#demo" onClick={scrollToDemo} className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-landing-blue px-6 py-3.5 text-sm font-bold text-white shadow-[4px_4px_0_#1e2130] transition-transform hover:-translate-y-0.5 sm:w-auto">
+            <a href="#demo" onClick={scrollToDemo} className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3.5 text-sm font-bold text-white shadow-md transition-colors hover:bg-accent-dark sm:w-auto">
               <MessageCircle className="h-4 w-4" /> Try the live demo <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </a>
-            <Link to="/app/signin" className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-landing-ink/20 bg-white/50 px-6 py-3 text-sm font-bold text-landing-ink hover:bg-white sm:w-auto">
+            <Link to="/app/signin" className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto">
               <Send className="h-4 w-4" /> Sign in
             </Link>
           </div>
@@ -38,8 +38,7 @@ export default function Hero() {
 
         <div className="relative mx-auto w-[calc(100%-8px)] max-w-lg lg:mx-0">
           <div className="absolute -right-4 -top-6 hidden h-32 w-32 rounded-full bg-landing-blue sm:block" />
-          <div className="absolute -bottom-8 -left-8 hidden h-28 w-28 rounded-[2rem] bg-landing-lime sm:block" />
-          <div className="landing-float relative overflow-hidden rounded-[1.5rem] border-2 border-landing-ink bg-white shadow-[7px_8px_0_#1e2130] sm:rounded-[2rem] sm:shadow-[12px_14px_0_#1e2130]">
+          <div className="landing-float relative overflow-hidden rounded-[1.5rem] border border-slate-300 bg-white shadow-2xl sm:rounded-[2rem]">
             <div className="landing-noise flex items-center justify-between bg-landing-blue px-5 py-4 text-white">
               <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-landing-lime font-heading font-extrabold text-landing-ink">ម</span><div><p className="text-sm font-bold">Mekong Clinic AI</p><p className="text-xs text-white/70">online now</p></div></div>
               <span className="h-2.5 w-2.5 rounded-full bg-landing-lime shadow-[0_0_0_5px_rgba(184,243,74,.2)]" />

@@ -65,8 +65,8 @@ export default function Pricing() {
               key={tier.name}
               className={`relative flex flex-col rounded-[1.75rem] border-2 p-6 ${
                 tier.highlighted
-                  ? "border-landing-ink bg-landing-ink text-white shadow-[8px_9px_0_#22c55e] md:-translate-y-3 md:-rotate-1"
-                  : "border-landing-ink bg-landing-paper shadow-[6px_7px_0_#1e2130]"
+                  ? "border-slate-900 bg-slate-900 text-white shadow-xl md:-translate-y-3"
+                  : "border-slate-200 bg-white shadow-md"
               }`}
             >
               {tier.highlighted && (

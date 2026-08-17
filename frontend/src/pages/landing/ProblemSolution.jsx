@@ -1,18 +1,15 @@
-import { ArrowRight, MessagesSquare, MoonStar, UserX, Zap } from "lucide-react";
+import { ArrowRight, Zap } from "lucide-react";
 
 const PAIRS = [
   {
-    icon: MoonStar,
     problem: "Customers message at 9pm — nobody answers.",
     solution: "Your assistant replies instantly, any time of day or night.",
   },
   {
-    icon: MessagesSquare,
     problem: "Staff answer the same 10 questions all day.",
     solution: "Your assistant handles the repetitive questions on its own.",
   },
   {
-    icon: UserX,
     problem: "Interested buyers disappear without leaving a number.",
     solution: "Every lead is captured and sent straight to your phone.",
   },
@@ -34,15 +31,12 @@ export default function ProblemSolution() {
         </div>
 
         <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {PAIRS.map(({ icon: Icon, problem, solution }) => (
+          {PAIRS.map(({ problem, solution }) => (
             <div
               key={problem}
-              className="group flex flex-col rounded-[1.75rem] border border-white/15 bg-surface p-6 transition-transform duration-200 hover:-translate-y-1 hover:border-accent/50"
+              className="group flex flex-col rounded-2xl border border-white/10 bg-slate-800 p-6 shadow-lg transition-colors duration-200 hover:border-accent/60 hover:bg-slate-800/90"
             >
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 transition-colors group-hover:bg-accent">
-                <Icon className="h-5 w-5 text-shell-text-muted group-hover:text-white" strokeWidth={1.75} />
-              </div>
-              <p className="mt-4 font-heading font-bold text-shell-text">{problem}</p>
+              <p className="font-heading font-bold text-shell-text">{problem}</p>
 
               <div className="my-5 flex items-center gap-2 text-accent">
                 <ArrowRight className="h-4 w-4" strokeWidth={2.5} />

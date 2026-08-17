@@ -57,20 +57,20 @@ export default function LiveDemo() {
       <div className="pointer-events-none absolute -right-20 top-20 h-64 w-64 rounded-full bg-landing-lime blur-3xl" />
       <div className="relative mx-auto max-w-3xl px-4 sm:px-8">
         <div className="mb-10 text-center">
-          <div className="mb-4 inline-flex -rotate-1 items-center gap-1.5 rounded-full border border-landing-ink bg-landing-lime px-3.5 py-1.5 text-xs font-extrabold text-landing-ink shadow-[2px_2px_0_#1e2130]">
-            <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+          <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm">
+            {/* <Sparkles className="h-3.5 w-3.5" strokeWidth={2} /> */}
             Live demo — real replies, no signup
           </div>
           <h2 className="text-balance font-heading text-3xl font-extrabold tracking-[-0.04em] text-landing-ink sm:text-5xl">
             Talk to Mekong Family Clinic's assistant
           </h2>
-          <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-landing-ink/60">
+          {/* <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-landing-ink/60">
             This is a real fictional business, wired to the real product. Ask
             in Khmer or English — it replies in whichever language you use.
-          </p>
+          </p> */}
         </div>
 
-        <div className="overflow-hidden rounded-[1.5rem] border-2 border-landing-ink bg-white shadow-[6px_7px_0_#1e2130] sm:rounded-[2rem] sm:shadow-[10px_12px_0_#1e2130]">
+        <div className="overflow-hidden rounded-[1.5rem] border border-slate-300 bg-white shadow-xl sm:rounded-[2rem]">
           <div className="landing-noise flex items-center gap-3 border-b-2 border-landing-ink bg-landing-ink px-5 py-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-landing-lime">
               <Bot className="h-5 w-5 text-landing-ink" strokeWidth={2} />
@@ -84,7 +84,6 @@ export default function LiveDemo() {
           <div className="flex h-80 flex-col gap-3 overflow-y-auto bg-white px-5 py-5 sm:h-96 sm:px-7">
             {history.length === 0 && (
               <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-landing-lime text-landing-ink shadow-[3px_3px_0_#1e2130]"><Sparkles className="h-6 w-6" /></div>
                 <p className="max-w-sm text-sm text-ink-muted">
                   Try asking about prices, hours, or services — try Khmer too.
                 </p>
@@ -93,7 +92,7 @@ export default function LiveDemo() {
                     <button
                       key={s}
                       onClick={() => sendMessage(s)}
-                      className="w-full rounded-full border border-landing-ink/20 bg-landing-paper px-3.5 py-2 text-xs font-bold text-landing-ink transition-all duration-150 hover:-translate-y-0.5 hover:border-landing-ink hover:bg-landing-lime sm:w-auto"
+                      className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-accent hover:bg-emerald-50 sm:w-auto"
                     >
                       {s}
                     </button>
@@ -137,7 +136,7 @@ export default function LiveDemo() {
             </p>
           )}
 
-          <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t-2 border-landing-ink bg-landing-paper p-3 sm:p-4">
+          <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 p-3 sm:p-4">
             <input
               type="text"
               value={draft}
@@ -150,7 +149,7 @@ export default function LiveDemo() {
             <button
               type="submit"
               disabled={sending || !draft.trim()}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-[2px_2px_0_#1e2130] transition-transform duration-150 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-white shadow-sm transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Send"
             >
               <Send className="h-4 w-4" strokeWidth={2.5} />

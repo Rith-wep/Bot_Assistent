@@ -8,9 +8,11 @@ const Admin = lazy(() => import("./pages/admin/Admin"));
 const ConversationDetail = lazy(() => import("./pages/ConversationDetail"));
 const Conversations = lazy(() => import("./pages/Conversations"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const KnowledgeEditor = lazy(() => import("./pages/KnowledgeEditor"));
 const Leads = lazy(() => import("./pages/Leads"));
 const Onboarding = lazy(() => import("./pages/onboarding/Onboarding"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const SettingsPage = lazy(() => import("./pages/Settings"));
 const SignIn = lazy(() => import("./pages/SignIn"));
 const SignUp = lazy(() => import("./pages/SignUp"));
@@ -28,13 +30,14 @@ function RouteLoading() {
 // landing-page visitor never downloads the dashboard's JS (recharts,
 // qrcode.react, every page) just to read the marketing site.
 export default function AppShell() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [onboardingCompleted, setOnboardingCompleted] = useState(null);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     async function checkOnboarding() {
+      if (authLoading) return;
       if (!isAuthenticated) {
         setOnboardingCompleted(null);
         setChecking(false);
@@ -54,9 +57,9 @@ export default function AppShell() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
-  if (isAuthenticated && checking) {
+  if (authLoading || (isAuthenticated && checking)) {
     return <RouteLoading />;
   }
 
@@ -84,6 +87,11 @@ export default function AppShell() {
             path="signin"
             element={isAuthenticated ? <Navigate to="/app" replace /> : <SignIn />}
           />
+          <Route
+            path="forgot-password"
+            element={isAuthenticated ? <Navigate to="/app" replace /> : <ForgotPassword />}
+          />
+          <Route path="reset-password" element={<ResetPassword />} />
           <Route
             path="onboarding"
             element={
