@@ -77,6 +77,17 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     finally:
         db.close()
 
+    await update.message.reply_text("Conversation reset. You can start again now.")
+    return
+
+    db = SessionLocal()
+    try:
+        conversation_state.start_new_conversation(db, business_id, chat_id)
+        conversation_state.clear_streak(business_id, chat_id)
+        db.commit()
+    finally:
+        db.close()
+
     await update.message.reply_text("ការសន្ទនាត្រូវបានលុបចោល។ ចាប់ផ្តើមថ្មីបានហើយ!")
 
 #====> /start command: claim ownership or welcome the user
@@ -116,8 +127,8 @@ def _claim_admin_invite(business_id: int, chat_id: int, token: str, name: str | 
 
 #====> /start command: get the business's configured welcome message
 def _welcome_message_for(business_id: int) -> str:
-    """The business's configured welcome message, in its default language,
-    falling back to whichever one is set, falling back to a generic greeting.
+    """The business's configured English welcome message, falling back to
+    whichever one is set, then a generic greeting.
     """
     db = SessionLocal()
     try:
@@ -125,14 +136,8 @@ def _welcome_message_for(business_id: int) -> str:
         if business is None:
             return _DEFAULT_GREETING
 
-        if business.default_language == "en" and business.welcome_message_en:
+        if business.welcome_message_en:
             return business.welcome_message_en
-        if business.default_language == "km" and business.welcome_message_km:
-            return business.welcome_message_km
-        if business.default_language == "both":
-            parts = [m for m in (business.welcome_message_km, business.welcome_message_en) if m]
-            if parts:
-                return "\n\n".join(parts)
 
         return business.welcome_message_en or business.welcome_message_km or _DEFAULT_GREETING
     finally:

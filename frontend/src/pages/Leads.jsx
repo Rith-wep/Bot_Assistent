@@ -1,6 +1,7 @@
 import { Download, Users } from "lucide-react";
-import { useEffect, useState } from "react";
-import { apiFetch, ApiError, downloadFile } from "../api/client";
+import { useState } from "react";
+import { ApiError, downloadFile } from "../api/client";
+import { useCachedApi } from "../api/useCachedApi";
 import Button from "../components/Button";
 import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
@@ -11,37 +12,19 @@ import { formatDate } from "../utils/format";
 const PAGE_SIZE = 20;
 
 export default function Leads() {
-  const [leads, setLeads] = useState([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const path = `/leads?page=${page}&page_size=${PAGE_SIZE}`;
+  const {
+    data,
+    loading,
+    error: loadError,
+    setError,
+  } = useCachedApi(path, { items: [], total: 0 });
   const [exporting, setExporting] = useState(false);
+  const error = loadError instanceof ApiError ? loadError.message : loadError;
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const data = await apiFetch(`/leads?page=${page}&page_size=${PAGE_SIZE}`);
-        if (!cancelled) {
-          setLeads(data.items);
-          setTotal(data.total);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "Could not load leads.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [page]);
+  const visibleLeads = data.items || [];
+  const visibleTotal = data.total ?? 0;
 
   async function handleExport() {
     setExporting(true);
@@ -73,7 +56,7 @@ export default function Leads() {
 
       {loading ? (
         <RowListSkeleton rows={5} />
-      ) : leads.length === 0 ? (
+      ) : visibleLeads.length === 0 ? (
         <EmptyState
           icon={Users}
           title="No leads yet"
@@ -93,7 +76,7 @@ export default function Leads() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {leads.map((lead) => (
+                {visibleLeads.map((lead) => (
                   <tr key={lead.id} className="transition-colors duration-150 hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-ink">
                       {lead.customer_name || "—"}
@@ -122,7 +105,7 @@ export default function Leads() {
 
           {/* Mobile cards */}
           <div className="space-y-3 sm:hidden">
-            {leads.map((lead) => (
+            {visibleLeads.map((lead) => (
               <div key={lead.id} className="rounded-xl border border-gray-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-heading font-bold text-ink">
@@ -147,7 +130,7 @@ export default function Leads() {
             ))}
           </div>
 
-          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+          <Pagination page={page} pageSize={PAGE_SIZE} total={visibleTotal} onPageChange={setPage} />
         </>
       )}
     </div>

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { apiFetch, ApiError } from "../api/client";
+import { ApiError } from "../api/client";
+import { useCachedApi } from "../api/useCachedApi";
 import PageHeader from "../components/PageHeader";
 import { RowListSkeleton } from "../components/Skeleton";
 import { ToastContainer, useToasts } from "../components/Toast";
@@ -10,31 +10,14 @@ import ProfileSection from "./settings/ProfileSection";
 import TelegramSection from "./settings/TelegramSection";
 
 export default function Settings() {
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const {
+    data: settings,
+    setData: setSettings,
+    loading,
+    error: loadError,
+  } = useCachedApi("/settings", null);
+  const error = loadError instanceof ApiError ? loadError.message : loadError;
   const { toasts, addToast } = useToasts();
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await apiFetch("/settings");
-        if (!cancelled) setSettings(data);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "Could not load settings.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   return (
     <div>

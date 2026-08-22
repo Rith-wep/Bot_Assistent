@@ -1,6 +1,7 @@
 import { BookOpen, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch, ApiError } from "../api/client";
+import { useCachedApi } from "../api/useCachedApi";
 import AiQuickAdd from "../components/AiQuickAdd";
 import Button from "../components/Button";
 import CategoryBadge from "../components/CategoryBadge";
@@ -13,29 +14,26 @@ import PageHeader from "../components/PageHeader";
 import { KnowledgeListSkeleton } from "../components/Skeleton";
 
 export default function KnowledgeEditor() {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const {
+    data: items,
+    setData: setItems,
+    loading,
+    error: loadError,
+    setError: setLoadError,
+  } = useCachedApi("/knowledge", []);
   const [addMode, setAddMode] = useState(null); // null | "ai" | "manual"
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const error = loadError instanceof ApiError ? loadError.message : loadError;
 
   async function loadItems() {
-    setLoading(true);
-    setError("");
     try {
       const data = await apiFetch("/knowledge");
       setItems(data);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load knowledge items.");
-    } finally {
-      setLoading(false);
+      setLoadError(err instanceof ApiError ? err.message : "Could not load knowledge items.");
     }
   }
-
-  useEffect(() => {
-    loadItems();
-  }, []);
 
   async function handleCreate(values) {
     await apiFetch("/knowledge", { method: "POST", body: values });
@@ -60,7 +58,7 @@ export default function KnowledgeEditor() {
       setDeleteTarget(null);
       await loadItems();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not delete item.");
+      setLoadError(err instanceof ApiError ? err.message : "Could not delete item.");
     }
   }
 

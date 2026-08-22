@@ -46,7 +46,7 @@ business_id scope is a bug, even if it "works."
 - **Database:** PostgreSQL (on Railway). SQLAlchemy ORM + Alembic migrations.
 - **Bot framework:** python-telegram-bot (async), running MULTIPLE bots
   (one per business) from one process.
-- **AI:** provider-agnostic module (currently Gemini API; must be swappable to
+- **AI:** provider-agnostic module (currently Groq API; must be swappable to
   Claude/other by config). All AI logic stays isolated in one module.
 - **Auth:** email + password with secure hashing (bcrypt/argon2), session or
   JWT — pick the simplest secure standard. Google OAuth is a later add-on.

@@ -1,7 +1,8 @@
 import { MessageSquare } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch, ApiError } from "../api/client";
+import { ApiError } from "../api/client";
+import { useCachedApi } from "../api/useCachedApi";
 import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
 import Pagination from "../components/Pagination";
@@ -12,36 +13,13 @@ const PAGE_SIZE = 20;
 
 export default function Conversations() {
   const navigate = useNavigate();
-  const [conversations, setConversations] = useState([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const path = `/conversations?page=${page}&page_size=${PAGE_SIZE}`;
+  const { data, loading, error: loadError } = useCachedApi(path, { items: [], total: 0 });
+  const conversations = data.items || [];
+  const total = data.total || 0;
+  const error = loadError instanceof ApiError ? loadError.message : loadError;
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const data = await apiFetch(`/conversations?page=${page}&page_size=${PAGE_SIZE}`);
-        if (!cancelled) {
-          setConversations(data.items);
-          setTotal(data.total);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "Could not load conversations.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [page]);
 
   return (
     <div>

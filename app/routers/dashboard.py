@@ -48,11 +48,10 @@ def _mock_chart(days: int, business_id: int) -> list[ChartPoint]:
     ]
 
 
-def _last_message_preview(message_repo: MessageRepository, conversation_id: int) -> str:
-    messages = message_repo.list_for_conversation(conversation_id)
-    if not messages:
+def _last_message_preview(message) -> str:
+    if message is None:
         return ""
-    text = messages[-1].text
+    text = message.text
     return text if len(text) <= 60 else text[:57] + "..."
 
 
@@ -98,6 +97,9 @@ def get_dashboard_stats(
     recent_leads_data, _ = lead_repo.list_paginated(1, 5)
     recent_conversations_data, _ = conversation_repo.list_paginated(1, 5)
     message_repo = MessageRepository(db, business_id)
+    latest_messages = message_repo.latest_for_conversations(
+        [conv.id for conv in recent_conversations_data]
+    )
     business = db.get(Business, business_id)
     language = "km" if business.default_language in ("km", "both") else "en"
 
@@ -124,7 +126,7 @@ def get_dashboard_stats(
             RecentConversation(
                 id=conv.id,
                 customer_name=conv.customer_name or f"Customer #{conv.customer_chat_id}",
-                last_message=_last_message_preview(message_repo, conv.id),
+                last_message=_last_message_preview(latest_messages.get(conv.id)),
                 language=language,
                 last_message_at=conv.last_message_at,
             )

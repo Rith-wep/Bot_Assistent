@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
 import Landing from "./pages/landing/Landing";
 
 // The dashboard app is its own lazy chunk — a landing-page visitor should
@@ -46,7 +47,9 @@ function App() {
         path="/app/*"
         element={
           <Suspense fallback={<AppShellLoading />}>
-            <AppShell />
+            <AuthProvider>
+              <AppShell />
+            </AuthProvider>
           </Suspense>
         }
       />

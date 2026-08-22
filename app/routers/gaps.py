@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentUser, get_current_user
@@ -25,9 +25,11 @@ def _cluster_out(cluster: QuestionCluster) -> ClusterOut:
 
 @router.get("", response_model=list[ClusterOut])
 def list_gaps(
-    current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)
+    limit: int = Query(5, ge=1, le=20),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> list[ClusterOut]:
-    clusters = gaps.list_open_clusters(db, current_user.business_id)
+    clusters = gaps.list_open_clusters(db, current_user.business_id, limit=limit)
     return [_cluster_out(c) for c in clusters]
 
 

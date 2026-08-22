@@ -33,6 +33,7 @@ function DraftCard({ draft, onChange, onRemove }) {
           className="mt-2 h-4 w-4 shrink-0 rounded border-gray-300 text-accent focus:ring-accent"
           aria-label="Include this item"
         />
+        
 
         <div className="min-w-0 flex-1 space-y-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[9rem_1fr_7rem]">

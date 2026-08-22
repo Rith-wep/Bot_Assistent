@@ -1,5 +1,7 @@
 import { getSupabase } from "../lib/supabase";
 
+const responseCache = new Map();
+
 export class ApiError extends Error {
   constructor(message, status) {
     super(message);
@@ -18,6 +20,29 @@ async function authHeaders() {
 
 function notifyUnauthorized() {
   window.dispatchEvent(new Event("auth:unauthorized"));
+}
+
+function cacheKey(path, auth) {
+  return `${auth ? "auth" : "public"}:${path}`;
+}
+
+export function getCachedApiData(path, { auth = true } = {}) {
+  return responseCache.get(cacheKey(path, auth));
+}
+
+export function invalidateApiCache(prefix = "") {
+  for (const key of responseCache.keys()) {
+    if (!prefix || key.includes(`:${prefix}`)) responseCache.delete(key);
+  }
+}
+
+export async function prefetchApi(path, options = {}) {
+  if (getCachedApiData(path, options) !== undefined) return;
+  try {
+    await apiFetch(path, options);
+  } catch {
+    // Prefetch should never interrupt navigation.
+  }
 }
 
 export async function apiFetch(path, { method = "GET", body, auth = true } = {}) {
@@ -43,6 +68,12 @@ export async function apiFetch(path, { method = "GET", body, auth = true } = {})
     if (auth && response.status === 401) notifyUnauthorized();
     const message = data?.detail || `Request failed (${response.status})`;
     throw new ApiError(message, response.status);
+  }
+
+  if (method === "GET") {
+    responseCache.set(cacheKey(path, auth), data);
+  } else {
+    invalidateApiCache();
   }
 
   return data;

@@ -15,7 +15,15 @@ class MessageDirection(str, enum.Enum):
 
 class Message(Base):
     __tablename__ = "messages"
-    __table_args__ = (Index("ix_messages_business_created", "business_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_messages_business_created", "business_id", "created_at"),
+        Index(
+            "ix_messages_business_conversation_created",
+            "business_id",
+            "conversation_id",
+            "created_at",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     conversation_id: Mapped[int] = mapped_column(

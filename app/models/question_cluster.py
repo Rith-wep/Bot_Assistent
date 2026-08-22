@@ -21,6 +21,12 @@ class QuestionCluster(Base):
     __tablename__ = "question_clusters"
     __table_args__ = (
         Index("ix_question_clusters_business_status", "business_id", "status"),
+        Index(
+            "ix_question_clusters_business_status_count",
+            "business_id",
+            "status",
+            "question_count",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

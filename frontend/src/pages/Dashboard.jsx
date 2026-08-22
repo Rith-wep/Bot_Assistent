@@ -1,8 +1,8 @@
 import { CreditCard, MessageSquare, Sparkles, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiFetch, ApiError } from "../api/client";
-import ConversationsChart from "../components/ConversationsChart";
+import { ApiError } from "../api/client";
+import { useCachedApi } from "../api/useCachedApi";
 import GapsCard from "../components/GapsCard";
 import GettingStartedCard from "../components/GettingStartedCard";
 import PageHeader from "../components/PageHeader";
@@ -11,6 +11,8 @@ import StartConversationCard from "../components/StartConversationCard";
 import StatCard from "../components/StatCard";
 import { ToastContainer, useToasts } from "../components/Toast";
 import { formatRelativeTime } from "../utils/format";
+
+const ConversationsChart = lazy(() => import("../components/ConversationsChart"));
 
 function DashboardSkeleton() {
   return (
@@ -32,32 +34,10 @@ function DashboardSkeleton() {
 
 export default function Dashboard() {
   const [range, setRange] = useState("30d");
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const path = `/dashboard/stats?range=${range}`;
+  const { data: stats, loading, error: loadError } = useCachedApi(path, null);
+  const error = loadError instanceof ApiError ? loadError.message : loadError;
   const { toasts, addToast } = useToasts();
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const data = await apiFetch(`/dashboard/stats?range=${range}`);
-        if (!cancelled) setStats(data);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "Could not load dashboard.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [range]);
 
   const checklistIncomplete =
     stats &&
@@ -133,7 +113,15 @@ export default function Dashboard() {
                   <GapsCard showToast={addToast} />
                 </div>
 
-                <ConversationsChart data={stats.chart} range={range} onRangeChange={setRange} />
+                <Suspense
+                  fallback={
+                    <div className="rounded-xl border border-gray-200 bg-white p-5">
+                      <Skeleton className="h-60 w-full" />
+                    </div>
+                  }
+                >
+                  <ConversationsChart data={stats.chart} range={range} onRangeChange={setRange} />
+                </Suspense>
 
                 <div className="mt-6 lg:mt-4 grid grid-cols-1 gap-6 lg:gap-4 lg:grid-cols-2">
                   <div className="rounded-xl border border-gray-200 bg-white p-5 lg:p-4">

@@ -78,7 +78,7 @@ scripts/                        # one-off/import/seed scripts
 
 | File | Purpose |
 |---|---|
-| `config.py` | `Settings` (pydantic-settings, reads `.env`): `database_url`, `secret_key`, `encryption_key`, `gemini_api_key`, `ai_model`, `app_env`. |
+| `config.py` | `Settings` (pydantic-settings, reads `.env`): `database_url`, `secret_key`, `encryption_key`, `groq_api_key`, `ai_model`, `app_env`. |
 | `security.py` | bcrypt password hashing; JWT create/decode (`HS256`, 7-day expiry); Fernet encrypt/decrypt for storing Telegram bot tokens at rest. |
 | `deps.py` | `get_current_user` FastAPI dependency — decodes the bearer token **and** re-checks the user against the DB on every request (not just trusting the token), so a deleted user is rejected immediately. |
 | `time.py` | `utcnow()` — naive-UTC datetime helper matching the DB column convention. |
@@ -132,8 +132,8 @@ making cross-tenant access opt-in and visible in a code review.
 
 ### Services (`app/services/`)
 
-- **`ai.py`** — the only provider-aware module (currently Google Gemini via
-  `google-genai`, model configurable via `AI_MODEL`). Per customer message it
+- **`ai.py`** — the only provider-aware module (currently Groq via
+  `groq`, model configurable via `AI_MODEL`). Per customer message it
   makes two calls: a reply generation call (system prompt = shared rules in
   `prompts/system_prompt.md` + business tone + rendered knowledge items,
   falls back to a Khmer apology if generation fails) and a silent structured
@@ -247,7 +247,7 @@ Backend:
 
 ```
 pip install -r requirements.txt
-cp .env.example .env   # fill in DATABASE_URL, SECRET_KEY, ENCRYPTION_KEY, GEMINI_API_KEY
+cp .env.example .env   # fill in DATABASE_URL, SECRET_KEY, ENCRYPTION_KEY, GROQ_API_KEY
 alembic upgrade head
 uvicorn app.main:app --reload         # web API on :8000
 python -m app.run_bot                 # Telegram bot engine, separate process

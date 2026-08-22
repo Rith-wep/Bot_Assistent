@@ -44,8 +44,10 @@ def record_unanswered_question(
     )
 
 
-def list_open_clusters(db: Session, business_id: int) -> list[QuestionCluster]:
-    return QuestionClusterRepository(db, business_id).list_open_by_count()
+def list_open_clusters(
+    db: Session, business_id: int, limit: int | None = None
+) -> list[QuestionCluster]:
+    return QuestionClusterRepository(db, business_id).list_open_by_count(limit=limit)
 
 
 def resolve_cluster(

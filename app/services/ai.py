@@ -1,11 +1,11 @@
-"""Gemini API calls and prompt assembly — the only AI-provider-aware module.
+"""Groq API calls and prompt assembly — the only AI-provider-aware module.
 
 Ported from v1_legacy/bot/ai.py: same two-call design (generate the
 customer-facing reply, then silently classify the exchange for lead/
 handoff signals) and the same personality rules — now assembled from
 this business's knowledge_items in the DB instead of business_info.md.
 
-Each customer message triggers two Gemini calls, kept deliberately
+Each customer message triggers two Groq calls, kept deliberately
 separate:
 1. _generate_reply — plain text generation (no tools), so it always
    reliably returns something to show the customer.
@@ -20,8 +20,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from google import genai
-from google.genai import types
+from groq import AsyncGroq
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -32,7 +31,7 @@ from app.services.knowledge import build_business_info_text
 
 logger = logging.getLogger(__name__)
 
-_client = genai.Client(api_key=settings.gemini_api_key)
+_client = AsyncGroq(api_key=settings.groq_api_key)
 
 _SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent.parent.parent / "prompts" / "system_prompt.md"
 _RULES_TEXT = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
@@ -51,7 +50,11 @@ FALLBACK_REPLY = (
     "សូមទោស! ឥឡូវនេះមានបញ្ហាបច្ចេកទេសបន្តិច។ សូមសាកល្បងម្តងទៀតក្នុងពេលបន្តិចទៀត។"
 )
 
-_GEMINI_ROLE = {"customer": "user", "bot": "model"}
+_GROQ_ROLE = {"customer": "user", "bot": "assistant"}
+
+FALLBACK_REPLY = (
+    "Sorry, I'm having a small technical issue right now. Please try again in a moment."
+)
 
 _TONE_INSTRUCTIONS = {
     "friendly": "",
@@ -64,6 +67,14 @@ _TONE_INSTRUCTIONS = {
         "whenever it fully answers the question."
     ),
 }
+
+_ENGLISH_ONLY_REPLY_NOTE = (
+    "\n\n## Temporary language override\n"
+    "For now, reply to customers in English only. This overrides any instruction "
+    "to reply in Khmer, mirror the customer's language, or use bilingual replies. "
+    "If the customer writes in Khmer or another language, understand their message "
+    "as best you can, but answer in clear, natural English."
+)
 
 _CLASSIFIER_INSTRUCTION = (
     "You are an internal classifier for a customer support conversation. You are "
@@ -80,29 +91,9 @@ _CLASSIFIER_INSTRUCTION = (
     "a short reason phrase for internal staff use."
 )
 
-_CLASSIFICATION_SCHEMA = types.Schema(
-    type="OBJECT",
-    properties={
-        "lead": types.Schema(
-            type="OBJECT",
-            nullable=True,
-            properties={
-                "name": types.Schema(type="STRING"),
-                "phone": types.Schema(type="STRING"),
-                "interest": types.Schema(type="STRING"),
-            },
-            required=["name", "phone", "interest"],
-        ),
-        "could_not_answer": types.Schema(type="BOOLEAN"),
-        "requested_human_or_upset": types.Schema(type="BOOLEAN"),
-        "reason": types.Schema(type="STRING"),
-    },
-    required=["could_not_answer", "requested_human_or_upset", "reason"],
-)
-
-
 _CLUSTER_INSTRUCTION = (
-    "You are grouping customer support questions that a business's AI assistant "
+    "Return one valid JSON object with a clusters array. You are grouping "
+    "customer support questions that a business's AI assistant "
     "could not answer, so the owner can see what knowledge is missing. You are "
     "given a list of existing open topic clusters (each with a label and sample "
     "questions) and a list of new unclustered questions (mixed English/Khmer, "
@@ -131,29 +122,6 @@ _CLUSTER_INSTRUCTION = (
     "existing cluster's label_en/label_km unchanged."
 )
 
-_CLUSTER_SCHEMA = types.Schema(
-    type="OBJECT",
-    properties={
-        "clusters": types.Schema(
-            type="ARRAY",
-            items=types.Schema(
-                type="OBJECT",
-                properties={
-                    "existing_cluster_index": types.Schema(type="INTEGER", nullable=True),
-                    "label_en": types.Schema(type="STRING"),
-                    "label_km": types.Schema(type="STRING"),
-                    "question_indices": types.Schema(
-                        type="ARRAY", items=types.Schema(type="INTEGER")
-                    ),
-                },
-                required=["label_en", "label_km", "question_indices"],
-            ),
-        ),
-    },
-    required=["clusters"],
-)
-
-
 async def cluster_questions(
     existing_clusters: list[dict], new_questions: list[dict]
 ) -> Optional[list[dict]]:
@@ -171,18 +139,17 @@ async def cluster_questions(
         ensure_ascii=False,
     )
     try:
-        response = await _client.aio.models.generate_content(
+        response = await _client.chat.completions.create(
             model=settings.ai_model,
-            contents=[types.Content(role="user", parts=[types.Part(text=prompt)])],
-            config=types.GenerateContentConfig(
-                system_instruction=_CLUSTER_INSTRUCTION,
-                response_mime_type="application/json",
-                response_schema=_CLUSTER_SCHEMA,
-            ),
+            messages=[
+                {"role": "system", "content": _CLUSTER_INSTRUCTION},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
         )
-        return json.loads(response.text)["clusters"]
+        return json.loads(response.choices[0].message.content or "{}")["clusters"]
     except Exception:
-        logger.warning("Gemini clustering call failed", exc_info=True)
+        logger.warning("Groq clustering call failed", exc_info=True)
         return None
 
 
@@ -191,7 +158,8 @@ _KNOWLEDGE_CATEGORIES = ["service", "faq", "hours", "location", "policy", "other
 MAX_EXTRACT_ITEMS = 40
 
 _EXTRACT_INSTRUCTION = (
-    "You are helping a small business in Cambodia turn raw notes (a price list, "
+    "Return one valid JSON object with an items array. You are helping a small "
+    "business in Cambodia turn raw notes (a price list, "
     "Facebook About text, a menu, or rough notes) into structured knowledge items "
     "for their customer-support AI assistant. The source text may be English, "
     "Khmer, or a mix, and may use Latin-letter transliterated Khmer.\n\n"
@@ -216,35 +184,6 @@ _EXTRACT_INSTRUCTION = (
     "business information, output an empty items list."
 )
 
-_EXTRACT_SCHEMA = types.Schema(
-    type="OBJECT",
-    properties={
-        "items": types.Schema(
-            type="ARRAY",
-            items=types.Schema(
-                type="OBJECT",
-                properties={
-                    "category": types.Schema(type="STRING", enum=_KNOWLEDGE_CATEGORIES),
-                    "title": types.Schema(type="STRING"),
-                    "price": types.Schema(type="STRING", nullable=True),
-                    "content_en": types.Schema(type="STRING", nullable=True),
-                    "content_km": types.Schema(type="STRING", nullable=True),
-                    "content_en_ai_generated": types.Schema(type="BOOLEAN"),
-                    "content_km_ai_generated": types.Schema(type="BOOLEAN"),
-                },
-                required=[
-                    "category",
-                    "title",
-                    "content_en_ai_generated",
-                    "content_km_ai_generated",
-                ],
-            ),
-        ),
-    },
-    required=["items"],
-)
-
-
 async def extract_knowledge_items(text: str) -> Optional[list[dict]]:
     """Quick-add with AI: turn pasted raw text into draft knowledge items for
     the owner to review — nothing is persisted here, this only returns drafts.
@@ -253,18 +192,17 @@ async def extract_knowledge_items(text: str) -> Optional[list[dict]]:
     returns a possibly-empty list on success, capped at MAX_EXTRACT_ITEMS.
     """
     try:
-        response = await _client.aio.models.generate_content(
+        response = await _client.chat.completions.create(
             model=settings.ai_model,
-            contents=[types.Content(role="user", parts=[types.Part(text=text)])],
-            config=types.GenerateContentConfig(
-                system_instruction=_EXTRACT_INSTRUCTION,
-                response_mime_type="application/json",
-                response_schema=_EXTRACT_SCHEMA,
-            ),
+            messages=[
+                {"role": "system", "content": _EXTRACT_INSTRUCTION},
+                {"role": "user", "content": text},
+            ],
+            response_format={"type": "json_object"},
         )
-        items = json.loads(response.text)["items"]
+        items = json.loads(response.choices[0].message.content or "{}")["items"]
     except Exception:
-        logger.warning("Gemini knowledge extraction call failed", exc_info=True)
+        logger.warning("Groq knowledge extraction call failed", exc_info=True)
         return None
 
     cleaned = []
@@ -290,6 +228,7 @@ def _build_system_instruction(business: Business, db: Session, handoff_active: b
         else ""
     )
     instruction = f"{intro}{_RULES_TEXT}"
+    instruction += _ENGLISH_ONLY_REPLY_NOTE
     instruction += _TONE_INSTRUCTIONS.get(business.tone.value, "")
     instruction += (
         "\n\n## Business Information (your ONLY source of facts — never use anything else)\n\n"
@@ -300,48 +239,47 @@ def _build_system_instruction(business: Business, db: Session, handoff_active: b
     return instruction
 
 
-def _to_contents(messages) -> list[types.Content]:
+def _to_contents(messages) -> list[dict[str, str]]:
     return [
-        types.Content(role=_GEMINI_ROLE[m.direction.value], parts=[types.Part(text=m.text)])
+        {"role": _GROQ_ROLE[m.direction.value], "content": m.text}
         for m in messages
     ]
 
 
-async def _generate_reply(contents: list[types.Content], system_instruction: str) -> str:
+async def _generate_reply(contents: list[dict[str, str]], system_instruction: str) -> str:
     """Generate the customer-facing reply. Retries once after a short delay on failure."""
-    config = types.GenerateContentConfig(system_instruction=system_instruction)
+    messages = [{"role": "system", "content": system_instruction}, *contents]
     try:
-        response = await _client.aio.models.generate_content(
-            model=settings.ai_model, contents=contents, config=config
+        response = await _client.chat.completions.create(
+            model=settings.ai_model, messages=messages
         )
     except Exception:
-        logger.warning("Gemini reply call failed, retrying once...", exc_info=True)
+        logger.warning("Groq reply call failed, retrying once...", exc_info=True)
         await asyncio.sleep(RETRY_DELAY_SECONDS)
-        response = await _client.aio.models.generate_content(
-            model=settings.ai_model, contents=contents, config=config
+        response = await _client.chat.completions.create(
+            model=settings.ai_model, messages=messages
         )
-    return (response.text or "").strip() or FALLBACK_REPLY
+    return (response.choices[0].message.content or "").strip() or FALLBACK_REPLY
 
 
-async def _classify(contents: list[types.Content], assistant_reply: str) -> Optional[dict]:
+async def _classify(contents: list[dict[str, str]], assistant_reply: str) -> Optional[dict]:
     """Silently classify the exchange for lead/handoff signals (never shown to the customer)."""
     classifier_contents = contents + [
-        types.Content(role="model", parts=[types.Part(text=assistant_reply)])
+        {"role": "assistant", "content": assistant_reply}
     ]
     try:
-        response = await _client.aio.models.generate_content(
+        response = await _client.chat.completions.create(
             model=settings.ai_model,
-            contents=classifier_contents,
-            config=types.GenerateContentConfig(
-                system_instruction=_CLASSIFIER_INSTRUCTION,
-                response_mime_type="application/json",
-                response_schema=_CLASSIFICATION_SCHEMA,
-            ),
+            messages=[
+                {"role": "system", "content": _CLASSIFIER_INSTRUCTION},
+                *classifier_contents,
+            ],
+            response_format={"type": "json_object"},
         )
-        return json.loads(response.text)
+        return json.loads(response.choices[0].message.content or "{}")
     except Exception:
         logger.warning(
-            "Gemini classification call failed; skipping lead/handoff detection for this message",
+            "Groq classification call failed; skipping lead/handoff detection for this message",
             exc_info=True,
         )
         return None
@@ -382,7 +320,7 @@ def _apply_conversation_flags(
 async def get_ai_reply(
     db: Session, business_id: int, chat_id: int, user_message: str
 ) -> tuple[str, Optional[dict], Optional[str], Conversation]:
-    """Send the customer's message (with recent DB history) to Gemini.
+    """Send the customer's message (with recent DB history) to Groq.
 
     Returns (reply_text, lead, handoff_reason, conversation):
     - lead: a dict with name/phone/interest if a complete lead was just detected, else None.
@@ -392,7 +330,7 @@ async def get_ai_reply(
     conversation = conversation_state.get_active_conversation(db, business_id, chat_id)
     history = conversation_state.get_recent_messages(db, business_id, conversation.id, MAX_EXCHANGES)
     contents = _to_contents(history)
-    contents.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
+    contents.append({"role": "user", "content": user_message})
 
     system_instruction = _build_system_instruction(business, db, conversation.handed_off)
 
@@ -427,10 +365,10 @@ async def generate_preview_reply(
     """
     business = db.get(Business, business_id)
     contents = [
-        types.Content(role=_GEMINI_ROLE[h["role"]], parts=[types.Part(text=h["text"])])
+        {"role": _GROQ_ROLE[h["role"]], "content": h["text"]}
         for h in history
     ]
-    contents.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
+    contents.append({"role": "user", "content": user_message})
 
     system_instruction = _build_system_instruction(business, db, handoff_active=False)
     return await _generate_reply(contents, system_instruction)

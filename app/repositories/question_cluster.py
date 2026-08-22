@@ -14,11 +14,13 @@ class QuestionClusterRepository(TenantRepository[QuestionCluster]):
             .all()
         )
 
-    def list_open_by_count(self) -> list[QuestionCluster]:
+    def list_open_by_count(self, limit: int | None = None) -> list[QuestionCluster]:
         """Top gaps first, for the dashboard card."""
-        return (
+        query = (
             self._scoped_query()
             .filter(QuestionCluster.status == UnansweredQuestionStatus.open)
             .order_by(QuestionCluster.question_count.desc(), QuestionCluster.id)
-            .all()
         )
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
