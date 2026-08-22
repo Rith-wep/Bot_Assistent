@@ -78,17 +78,17 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         db.close()
 
     await update.message.reply_text("Conversation reset. You can start again now.")
-    return
+    # return
 
-    db = SessionLocal()
-    try:
-        conversation_state.start_new_conversation(db, business_id, chat_id)
-        conversation_state.clear_streak(business_id, chat_id)
-        db.commit()
-    finally:
-        db.close()
+    # db = SessionLocal()
+    # try:
+    #     conversation_state.start_new_conversation(db, business_id, chat_id)
+    #     conversation_state.clear_streak(business_id, chat_id)
+    #     db.commit()
+    # finally:
+    #     db.close()
 
-    await update.message.reply_text("ការសន្ទនាត្រូវបានលុបចោល។ ចាប់ផ្តើមថ្មីបានហើយ!")
+    # await update.message.reply_text("ការសន្ទនាត្រូវបានលុបចោល។ ចាប់ផ្តើមថ្មីបានហើយ!")
 
 #====> /start command: claim ownership or welcome the user
 def _claim_owner_if_needed(business_id: int, chat_id: int) -> bool:
