@@ -145,9 +145,10 @@ class BotEngine:
 
     async def run_forever(self) -> None:
         await self.start_all()
+
         try:
             await self.poll_for_new_bots()
         except asyncio.CancelledError:
-            pass
+            raise
         finally:
             await self.stop_all()
