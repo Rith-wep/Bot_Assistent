@@ -15,7 +15,7 @@ export default function StartConversationCard({ botUsername, telegramConnected }
   }
 
   return (
-    <div className="flex flex-col items-center gap-5 rounded-xl border border-gray-200 bg-white p-6 text-center sm:flex-row sm:text-left">
+    <div className="flex flex-col items-center gap-5 rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm sm:flex-row sm:text-left">
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-soft">
         <Send className="h-6 w-6 text-accent-dark" strokeWidth={1.75} />
       </div>

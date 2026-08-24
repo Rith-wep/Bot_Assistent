@@ -38,8 +38,9 @@ def start_new_conversation(db: Session, business_id: int, chat_id: int) -> Conve
 def get_recent_messages(
     db: Session, business_id: int, conversation_id: int, max_exchanges: int = MAX_EXCHANGES
 ) -> list[Message]:
-    messages = MessageRepository(db, business_id).list_for_conversation(conversation_id)
-    return messages[-(max_exchanges * 2):]
+    return MessageRepository(db, business_id).list_for_conversation(
+        conversation_id, limit=max_exchanges * 2
+    )
 
 
 def add_message(db: Session, business_id: int, conversation_id: int, direction: str, text: str) -> Message:

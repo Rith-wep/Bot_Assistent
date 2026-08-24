@@ -1,11 +1,14 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { invalidateApiCache, setAccessTokenProvider } from "../api/client";
 import { getSupabase } from "../lib/supabase";
 
 const AuthContext = createContext(null);
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 async function bootstrapProfile(session, business) {
-  const response = await fetch("/api/auth/bootstrap", {
+  const response = await fetch(`${API_BASE_URL}/api/auth/bootstrap`, {
     method: "POST",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${session.access_token}`,
@@ -16,6 +19,9 @@ async function bootstrapProfile(session, business) {
   if (!response.ok) {
     throw new Error(data?.detail || "Unable to initialize your account");
   }
+  if (!data?.user_id || !data?.business_id) {
+    throw new Error("Backend API is not configured correctly for this frontend");
+  }
   return data;
 }
 
@@ -23,15 +29,29 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const bootstrappingTokenRef = useRef(null);
+  const sessionRef = useRef(null);
+  const profileRef = useRef(null);
 
   const completeAuthentication = useCallback(async (nextSession, business) => {
     if (!nextSession) {
+      bootstrappingTokenRef.current = null;
       setSession(null);
       setProfile(null);
       setLoading(false);
       return null;
     }
 
+    if (
+      bootstrappingTokenRef.current === nextSession.access_token &&
+      sessionRef.current?.access_token === nextSession.access_token &&
+      profileRef.current
+    ) {
+      setLoading(false);
+      return profileRef.current;
+    }
+
+    bootstrappingTokenRef.current = nextSession.access_token;
     setLoading(true);
     try {
       const nextProfile = await bootstrapProfile(nextSession, business);
@@ -39,6 +59,7 @@ export function AuthProvider({ children }) {
       setProfile(nextProfile);
       return nextProfile;
     } catch (error) {
+      bootstrappingTokenRef.current = null;
       setSession(null);
       setProfile(null);
       throw error;
@@ -51,11 +72,24 @@ export function AuthProvider({ children }) {
     try {
       await getSupabase().auth.signOut();
     } finally {
+      bootstrappingTokenRef.current = null;
+      invalidateApiCache();
       setSession(null);
       setProfile(null);
       setLoading(false);
     }
   }, []);
+
+  const updateProfile = useCallback((nextProfile) => {
+    setProfile((current) => ({ ...current, ...nextProfile }));
+  }, []);
+
+  useEffect(() => {
+    sessionRef.current = session;
+    profileRef.current = profile;
+    setAccessTokenProvider(() => session?.access_token || null);
+    return () => setAccessTokenProvider(null);
+  }, [profile, session]);
 
   useEffect(() => {
     let active = true;
@@ -84,7 +118,15 @@ export function AuthProvider({ children }) {
           setLoading(false);
           return;
         }
-        if (event === "TOKEN_REFRESHED") setSession(nextSession);
+        if (event === "TOKEN_REFRESHED") {
+          setSession(nextSession);
+          return;
+        }
+        if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+          completeAuthentication(nextSession).catch(async () => {
+            if (active) await supabase.auth.signOut();
+          });
+        }
       });
       subscription = listener.data.subscription;
     } catch {
@@ -108,7 +150,9 @@ export function AuthProvider({ children }) {
         loading,
         isAuthenticated: Boolean(session && profile),
         businessName: profile?.business_name || "",
+        businessLogo: profile?.logo_url || "",
         completeAuthentication,
+        updateProfile,
         logout,
       }}
     >

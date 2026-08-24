@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentUser, get_current_user
 from app.db.session import get_db
+from app.models.business import Business
 from app.repositories.knowledge_item import KnowledgeItemRepository
 from app.schemas.knowledge import (
     KnowledgeExtractRequest,
@@ -13,7 +14,7 @@ from app.schemas.knowledge import (
     KnowledgeItemOut,
     KnowledgeItemUpdate,
 )
-from app.services.ai import extract_knowledge_items
+from app.services.ai import clear_prompt_context_cache, extract_knowledge_items
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
@@ -55,6 +56,7 @@ def create_knowledge(
 ) -> KnowledgeItemOut:
     item = KnowledgeItemRepository(db, current_user.business_id).create(**payload.model_dump())
     db.commit()
+    clear_prompt_context_cache(current_user.business_id)
     db.refresh(item)
     return item
 
@@ -63,10 +65,12 @@ def create_knowledge(
 async def ai_extract_knowledge(
     payload: KnowledgeExtractRequest,
     current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> KnowledgeExtractResponse:
     _check_extract_rate_limit(current_user.business_id)
 
-    items = await extract_knowledge_items(payload.text)
+    business = db.get(Business, current_user.business_id)
+    items = await extract_knowledge_items(payload.text, business.business_type.value if business else "professional_other")
     if items is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -90,6 +94,7 @@ def update_knowledge(
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
     db.commit()
+    clear_prompt_context_cache(current_user.business_id)
     db.refresh(item)
     return item
 
@@ -104,3 +109,4 @@ def delete_knowledge(
     if not repo.delete(item_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge item not found")
     db.commit()
+    clear_prompt_context_cache(current_user.business_id)

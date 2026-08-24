@@ -32,7 +32,17 @@ async def process_lead(
     """Save a captured lead to the DB and notify the business owner + admins on Telegram."""
     conversation_state.set_customer_name(conversation, name)
 
-    lead = LeadRepository(db, business_id).create(
+    lead_repo = LeadRepository(db, business_id)
+    existing_lead = lead_repo.find_for_conversation(conversation.id, phone)
+    if existing_lead:
+        logger.info(
+            "Skipping duplicate lead capture for conversation=%s lead=%s",
+            conversation.id,
+            existing_lead.id,
+        )
+        return
+
+    lead = lead_repo.create(
         conversation_id=conversation.id,
         customer_name=name,
         phone=phone,

@@ -129,14 +129,14 @@ export default function Step4GoLive() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-ink">Test and go live</h1>
-      <p className="mt-1 text-sm text-ink-muted">
+      <h1 className="font-heading text-2xl font-bold tracking-tight text-ink sm:text-3xl">Test and go live</h1>
+      <p className="mt-2 text-sm leading-6 text-ink-muted">
         Try asking your assistant a real question, then go live when you're happy.
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="mb-1 font-heading font-bold text-ink">Checklist</h2>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex items-center justify-between gap-3"><h2 className="font-heading font-bold text-ink">Before you go live</h2><span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-accent-dark">Checklist</span></div>
           <ChecklistRow done={checklist.knowledge_ready}>Knowledge added</ChecklistRow>
           <ChecklistRow done={checklist.bot_connected}>Bot connected</ChecklistRow>
           <ChecklistRow done={checklist.owner_linked}>Owner linked</ChecklistRow>
@@ -156,7 +156,7 @@ export default function Step4GoLive() {
           </Button>
         </div>
 
-        <div className="flex flex-col rounded-xl border border-gray-200 bg-white p-5">
+        <div className="flex flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="mb-3 font-heading font-bold text-ink">Try it out</h2>
           <div className="flex-1 space-y-2 overflow-y-auto" style={{ maxHeight: 320 }}>
             {history.length === 0 && (

@@ -4,10 +4,12 @@ import Button from "../../components/Button";
 import SectionCard from "../../components/SectionCard";
 
 const BUSINESS_TYPES = [
-  { value: "clinic", label: "Clinic" },
-  { value: "shop", label: "Shop" },
-  { value: "real_estate", label: "Real Estate" },
-  { value: "other", label: "Other" },
+  { value: "service_appointment", label: "Services and appointments" },
+  { value: "product_retail", label: "Product retail" },
+  { value: "food_beverage", label: "Food and beverage" },
+  { value: "property_real_estate", label: "Property and real estate" },
+  { value: "education", label: "Education" },
+  { value: "professional_other", label: "Professional or other" },
 ];
 
 const LANGUAGES = [
@@ -17,6 +19,8 @@ const LANGUAGES = [
 ];
 
 const TIMEZONES = ["Asia/Phnom_Penh", "Asia/Bangkok", "Asia/Ho_Chi_Minh", "UTC"];
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 const DAYS = [
   ["mon", "Monday"],
@@ -52,6 +56,7 @@ export default function ProfileSection({ profile, onSaved, showToast }) {
     logo_url: profile.logo_url || "",
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -88,6 +93,39 @@ export default function ProfileSection({ profile, onSaved, showToast }) {
     }
   }
 
+  async function handleLogoUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+      showToast("Cloudinary upload is not configured.", "error");
+      return;
+    }
+    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
+      showToast("Choose an image smaller than 5 MB.", "error");
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      body.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: "POST", body },
+      );
+      const data = await response.json();
+      if (!response.ok || !data.secure_url) throw new Error(data.error?.message || "Upload failed");
+      update("logo_url", data.secure_url);
+      showToast("Logo uploaded. Save the profile to apply it.");
+    } catch (err) {
+      showToast(err.message || "Could not upload logo.", "error");
+    } finally {
+      setUploadingLogo(false);
+      event.target.value = "";
+    }
+  }
+
   return (
     <SectionCard title="Business profile" description="Shown to your team, not to customers.">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -116,16 +154,23 @@ export default function ProfileSection({ profile, onSaved, showToast }) {
         </div>
       </div>
 
-      <div>
-        <label className={labelClass}>Logo URL</label>
-        <input
-          type="text"
-          value={form.logo_url}
-          onChange={(e) => update("logo_url", e.target.value)}
-          placeholder="https://..."
-          className={fieldClass}
-        />
-      </div>
+        <div>
+          <label className={labelClass}>Business logo</label>
+          <div className="flex flex-wrap items-center gap-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
+            {form.logo_url ? (
+              <img src={form.logo_url} alt="Business logo preview" className="h-16 w-16 rounded-lg border border-gray-200 bg-white object-contain p-1" />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-ink-muted">No logo</div>
+            )}
+            <div>
+              <label className="inline-flex cursor-pointer items-center rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-dark">
+                {uploadingLogo ? "Uploading..." : "Upload image"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoUpload} disabled={uploadingLogo} className="sr-only" />
+              </label>
+              <p className="mt-1 text-xs text-ink-muted">PNG, JPG, or WebP. Maximum 5 MB.</p>
+            </div>
+          </div>
+        </div>
 
       <div>
         <label className={labelClass}>Address</label>

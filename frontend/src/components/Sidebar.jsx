@@ -1,8 +1,23 @@
 import { LogOut } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { prefetchApi } from "../api/client";
 import { APP_NAVIGATION } from "../config/navigation";
 import { useAuth } from "../context/AuthContext";
 import Logo from "./Logo";
+
+const PREFETCH_PATHS = {
+  "/app/dashboard": ["/dashboard/summary"],
+  "/app/knowledge": ["/knowledge"],
+  "/app/leads": ["/leads?page=1&page_size=20"],
+  "/app/conversations": ["/conversations?page=1&page_size=20"],
+  "/app/settings": ["/settings/core", "/settings/ai-profile"],
+};
+
+function prefetchRoute(to) {
+  for (const path of PREFETCH_PATHS[to] || []) {
+    prefetchApi(path);
+  }
+}
 
 function NavItems({ orientation }) {
   const isRow = orientation === "row";
@@ -13,6 +28,8 @@ function NavItems({ orientation }) {
           <NavLink
             key={to}
             to={to}
+            onFocus={() => prefetchRoute(to)}
+            onMouseEnter={() => prefetchRoute(to)}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg font-medium transition-colors duration-150 ${
                 isRow ? "flex-col gap-1 px-3 py-1.5 text-[11px]" : "px-3 py-2 text-sm"
@@ -33,14 +50,24 @@ function NavItems({ orientation }) {
 }
 
 export default function Sidebar() {
-  const { businessName, logout } = useAuth();
+  const { businessName, businessLogo, logout } = useAuth();
 
   return (
     <>
       {/* Desktop rail */}
       <aside className="hidden w-60 shrink-0 flex-col bg-base sm:flex">
         <div className="mx-3 mt-2 flex min-h-16 items-center gap-2 rounded-xl border border-gray-400 bg-gray-300 px-2.5 py-2 shadow-md">
-          <Logo className="h-12 w-16 shrink-0" />
+          {businessLogo ? (
+            <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white p-1.5">
+              <img
+                src={businessLogo}
+                alt={`${businessName || "Business"} logo`}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+          ) : (
+            <Logo className="h-12 w-16 shrink-0" />
+          )}
           {businessName ? (
             <span className="truncate font-sans text-base font-bold text-slate-700">
               {businessName}

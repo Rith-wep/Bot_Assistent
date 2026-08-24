@@ -31,7 +31,7 @@ function CustomTooltip({ active, payload, label }) {
 
 export default function ConversationsChart({ data, range, onRangeChange }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="font-heading font-bold text-ink">Conversations</h2>
         <div className="flex gap-1 rounded-lg bg-gray-100 p-1">

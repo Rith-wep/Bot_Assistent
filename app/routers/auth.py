@@ -9,6 +9,7 @@ from app.models.user import User
 from app.repositories.business import BusinessRepository
 from app.repositories.user import UserRepository, get_user_by_email, get_user_by_supabase_id
 from app.schemas.auth import AuthProfileResponse, BootstrapRequest
+from app.services.ai_profile import ensure_ai_profile
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -23,6 +24,7 @@ def _profile(db: Session, user) -> AuthProfileResponse:
         role=user.role.value,
         business_id=business.id,
         business_name=business.name,
+        logo_url=business.logo_url,
     )
 
 
@@ -60,7 +62,10 @@ def bootstrap(
             detail="Business information is required to finish account setup",
         )
     try:
-        business_type = BusinessType(raw_business_type or BusinessType.other.value)
+        try:
+            business_type = BusinessType(raw_business_type or BusinessType.professional_other.value)
+        except ValueError:
+            business_type = BusinessType.professional_other
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -82,6 +87,7 @@ def bootstrap(
             password_hash=None,
             role="owner",
         )
+        ensure_ai_profile(db, business)
         db.commit()
     except IntegrityError:
         db.rollback()

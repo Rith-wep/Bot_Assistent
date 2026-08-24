@@ -25,6 +25,8 @@ from app.schemas.dashboard import (
     ChartPoint,
     ChecklistStatus,
     DashboardStats,
+    DashboardActivity,
+    DashboardSummary,
     PaymentsStat,
     RecentConversation,
     RecentLead,
@@ -55,6 +57,54 @@ def _last_message_preview(message) -> str:
     return text if len(text) <= 60 else text[:57] + "..."
 
 
+def _summary(db: Session, business_id: int) -> DashboardSummary:
+    conversation_repo = ConversationRepository(db, business_id)
+    bot_config = BotConfigRepository(db, business_id).get_for_business()
+    _, real_total = conversation_repo.list_paginated(1, 1)
+    knowledge_added = KnowledgeItemRepository(db, business_id).exists()
+    telegram_connected = bot_config is not None and bot_config.is_active
+    has_activity = real_total > 0
+    if not has_activity:
+        cards = (StatCard(value=0), StatCard(value=0), StatCard(value=0), StatCard(value=0))
+        payments = PaymentsStat(count=0, total=0)
+    else:
+        cards = (StatCard(value=128, change_pct=12.5), StatCard(value=24, change_pct=-4.2), StatCard(value=340, change_pct=8.0), StatCard(value=12, change_pct=-15.0))
+        payments = PaymentsStat(count=9, total=245.50, change_pct=20.0)
+    return DashboardSummary(
+        has_activity=has_activity,
+        bot_username=bot_config.bot_username if bot_config else None,
+        total_conversations=cards[0], new_leads=cards[1], messages_ai_handled=cards[2],
+        messages_escalated=cards[3], payments=payments,
+        checklist=ChecklistStatus(knowledge_added=knowledge_added, telegram_connected=telegram_connected, admin_notifications_connected=False, payments_enabled=False),
+    )
+
+
+@router.get("/summary", response_model=DashboardSummary)
+def get_dashboard_summary(current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> DashboardSummary:
+    return _summary(db, current_user.business_id)
+
+
+@router.get("/activity", response_model=DashboardActivity)
+def get_dashboard_activity(
+    range: str = Query("30d", pattern="^(7d|30d|90d)$"),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> DashboardActivity:
+    business_id = current_user.business_id
+    lead_repo = LeadRepository(db, business_id)
+    conversation_repo = ConversationRepository(db, business_id)
+    recent_leads_data, _ = lead_repo.list_paginated(1, 5)
+    recent_conversations_data, _ = conversation_repo.list_paginated(1, 5)
+    latest_messages = MessageRepository(db, business_id).latest_for_conversations([c.id for c in recent_conversations_data])
+    business = db.get(Business, business_id)
+    language = "km" if business.default_language in ("km", "both") else "en"
+    return DashboardActivity(
+        chart=_mock_chart(RANGE_DAYS[range], business_id),
+        recent_leads=[RecentLead(id=lead.id, name=lead.customer_name or "Unknown", phone=lead.phone or "", source="Telegram", created_at=lead.created_at) for lead in recent_leads_data],
+        recent_conversations=[RecentConversation(id=conv.id, customer_name=conv.customer_name or f"Customer #{conv.customer_chat_id}", last_message=_last_message_preview(latest_messages.get(conv.id)), language=language, last_message_at=conv.last_message_at) for conv in recent_conversations_data],
+    )
+
+
 @router.get("/stats", response_model=DashboardStats)
 def get_dashboard_stats(
     range: str = Query("30d", pattern="^(7d|30d|90d)$"),
@@ -71,7 +121,7 @@ def get_dashboard_stats(
     real_conversations, real_total = conversation_repo.list_paginated(1, 1)
     has_activity = real_total > 0
 
-    knowledge_added = len(KnowledgeItemRepository(db, business_id).list_ordered()) > 0
+    knowledge_added = KnowledgeItemRepository(db, business_id).exists()
     telegram_connected = bot_config is not None and bot_config.is_active
 
     if not has_activity:

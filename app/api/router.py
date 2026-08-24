@@ -16,6 +16,7 @@ from app.routers import (
 
 api_router = APIRouter()
 
+## Include individual routers for different modules
 api_router.include_router(auth.router)
 api_router.include_router(onboarding.router)
 api_router.include_router(dashboard.router)

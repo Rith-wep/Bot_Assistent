@@ -1,6 +1,6 @@
 import { ShieldAlert } from "lucide-react";
-import { useEffect, useState } from "react";
-import { apiFetch, ApiError } from "../../api/client";
+import { ApiError } from "../../api/client";
+import { useCachedApi } from "../../api/useCachedApi";
 import EmptyState from "../../components/EmptyState";
 import PageHeader from "../../components/PageHeader";
 import { RowListSkeleton } from "../../components/Skeleton";
@@ -13,35 +13,14 @@ const STATUS_STYLES = {
 };
 
 export default function Admin() {
-  const [businesses, setBusinesses] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [forbidden, setForbidden] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const data = await apiFetch("/admin/businesses");
-        if (!cancelled) setBusinesses(data);
-      } catch (err) {
-        if (cancelled) return;
-        if (err instanceof ApiError && err.status === 403) {
-          setForbidden(true);
-        } else {
-          setError(err instanceof ApiError ? err.message : "Could not load businesses.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: businesses, loading, error: loadError } = useCachedApi("/admin/businesses", null);
+  const forbidden = loadError instanceof ApiError && loadError.status === 403;
+  const error =
+    loadError && !forbidden
+      ? loadError instanceof ApiError
+        ? loadError.message
+        : "Could not load businesses."
+      : "";
 
   return (
     <div>

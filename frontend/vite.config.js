@@ -6,6 +6,11 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    // Keep local auth/API responses and dev assets from being reused after a
+    // backend or frontend change. Production builds use hashed asset names.
+    headers: {
+      "Cache-Control": "no-store",
+    },
     proxy: {
       '/api': 'http://127.0.0.1:8000',
     },

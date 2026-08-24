@@ -11,10 +11,12 @@ from app.db.base import Base
 
 
 class BusinessType(str, enum.Enum):
-    clinic = "clinic"
-    shop = "shop"
-    real_estate = "real_estate"
-    other = "other"
+    service_appointment = "service_appointment"
+    product_retail = "product_retail"
+    food_beverage = "food_beverage"
+    property_real_estate = "property_real_estate"
+    education = "education"
+    professional_other = "professional_other"
 
 
 class Plan(str, enum.Enum):
@@ -42,7 +44,7 @@ class Business(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     business_type: Mapped[BusinessType] = mapped_column(
-        Enum(BusinessType, name="business_type"), default=BusinessType.other
+        Enum(BusinessType, name="business_type"), default=BusinessType.professional_other
     )
     default_language: Mapped[str] = mapped_column(String(10), default="km")
     plan: Mapped[Plan] = mapped_column(Enum(Plan, name="plan"), default=Plan.trial)

@@ -5,7 +5,8 @@ in Cambodia. See [CLAUDE.md](CLAUDE.md) for the full product plan, schema, and
 build order this project follows.
 
 - **v2 (this repo root)** — FastAPI backend (`app/`), Alembic migrations
-  (`alembic/`), React dashboard (`frontend/`).
+  (`alembic/`), React dashboard (`frontend/`). Supporting documentation lives
+  in `docs/`, and seed utilities live in `scripts/seed/`.
 The current application preserves the original bot behavior (Khmer replies,
 lead capture, human handoff, memory, and error handling) on a multi-tenant
 Postgres architecture scoped by `business_id`.
@@ -37,7 +38,9 @@ app/
 alembic/                 # DB migrations
 frontend/                  # React dashboard (SPA, Vite + Tailwind v4)
 prompts/                      # shared system prompt used by the AI service
-scripts/                        # one-off/import/seed scripts
+scripts/                        # operational and seed scripts
+docs/                           # architecture, implementation, and audit docs
+tests/                          # backend and frontend test suites
 ```
 
 ## Backend
@@ -236,7 +239,7 @@ separate component.
 
 ## Scripts (`scripts/`)
 
-- **`seed_test_business.py`** — creates a throwaway business + user for local
+- **`seed/seed_test_business.py`** — creates a throwaway business + user for local
   testing.
 - **`seed_demo_business.py`** — creates the fictional business used by the
   public live demo.

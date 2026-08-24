@@ -50,15 +50,14 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-page">
       <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center px-4 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-3 rounded-xl border border-gray-400 bg-gray-300 px-4 py-2 shadow-md">
-            <Logo className="h-14 w-24 shrink-0" />
-            <span className="truncate font-sans text-base font-bold text-slate-700">Set up your assistant</span>
+        <div className="mx-auto flex min-h-16 w-full max-w-6xl items-center px-4 py-2 sm:px-6 lg:px-8">
+          <div className="flex items-center rounded-xl border border-gray-300 bg-gray-100 px-3 py-2 shadow-sm sm:px-4">
+            <Logo className="h-10 w-16 shrink-0 sm:h-12 sm:w-20" />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8 lg:px-8">
+      <main className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pt-10 lg:px-8">
         <Stepper currentStep={step} />
 
         <div className={step === 4 ? "w-full" : "mx-auto w-full max-w-2xl"}>

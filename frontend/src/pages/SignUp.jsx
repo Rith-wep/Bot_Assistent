@@ -6,10 +6,12 @@ import Button from "../components/Button";
 import Logo from "../components/Logo";
 
 const BUSINESS_TYPES = [
-  { value: "clinic", label: "Clinic" },
-  { value: "shop", label: "Shop" },
-  { value: "real_estate", label: "Real Estate" },
-  { value: "other", label: "Other" },
+  { value: "service_appointment", label: "Services and appointments" },
+  { value: "product_retail", label: "Product retail" },
+  { value: "food_beverage", label: "Food and beverage" },
+  { value: "property_real_estate", label: "Property and real estate" },
+  { value: "education", label: "Education" },
+  { value: "professional_other", label: "Professional or other" },
 ];
 
 const inputClass =
@@ -23,10 +25,12 @@ export default function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [businessName, setBusinessName] = useState("");
-  const [businessType, setBusinessType] = useState("clinic");
+  const [businessType, setBusinessType] = useState("professional_other");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -64,6 +68,24 @@ export default function SignUp() {
     }
   }
 
+  async function resendConfirmation() {
+    setError("");
+    setResending(true);
+    try {
+      const { error: resendError } = await getSupabase().auth.resend({
+        type: "signup",
+        email: email.trim(),
+        options: { emailRedirectTo: `${window.location.origin}/app` },
+      });
+      if (resendError) throw resendError;
+      setResent(true);
+    } catch (err) {
+      setError(err?.message || "Unable to resend the confirmation email.");
+    } finally {
+      setResending(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-base px-4 py-10">
       <div className="w-full max-w-sm">
@@ -84,6 +106,11 @@ export default function SignUp() {
               We sent a secure confirmation link to {email}. Open it to finish setting up your
               account.
             </p>
+            {error && <p className="mt-3 rounded-lg bg-error-soft px-3 py-2 text-sm text-error">{error}</p>}
+            {resent && <p className="mt-3 text-sm font-medium text-accent">Confirmation email sent again.</p>}
+            <button type="button" onClick={resendConfirmation} disabled={resending} className="mt-4 text-sm font-semibold text-accent hover:text-accent-dark">
+              {resending ? "Sending..." : "Resend confirmation email"}
+            </button>
           </div>
         ) : (
           <form

@@ -17,6 +17,7 @@ separate:
 import asyncio
 import json
 import logging
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +26,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.business import Business
+from app.models.ai_profile import AIProfile
+from app.models.business_rule import BusinessRule
 from app.models.conversation import Conversation
 from app.services import conversation_state, gaps
 from app.services.knowledge import build_business_info_text
@@ -35,6 +38,22 @@ _client = AsyncGroq(api_key=settings.groq_api_key)
 
 _SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent.parent.parent / "prompts" / "system_prompt.md"
 _RULES_TEXT = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+_prompt_context_cache: dict[int, tuple[float, str, bool]] = {}
+_PROMPT_CONTEXT_TTL_SECONDS = 60
+
+
+def clear_prompt_context_cache(business_id: int) -> None:
+    _prompt_context_cache.pop(business_id, None)
+
+
+def _get_cached_business_info(db: Session, business_id: int) -> str:
+    now = time.monotonic()
+    cached = _prompt_context_cache.get(business_id)
+    if cached and now - cached[0] < _PROMPT_CONTEXT_TTL_SECONDS:
+        return cached[1]
+    info = build_business_info_text(conversation_state.get_knowledge_items(db, business_id))
+    _prompt_context_cache[business_id] = (now, info, False)
+    return info
 
 RETRY_DELAY_SECONDS = 2
 MAX_EXCHANGES = conversation_state.MAX_EXCHANGES
@@ -66,6 +85,14 @@ _TONE_INSTRUCTIONS = {
         "\n\nKeep replies as brief as possible — prefer a single short sentence "
         "whenever it fully answers the question."
     ),
+}
+
+_PERSONALITY_INSTRUCTIONS = {
+    "professional": "formal, precise, and reassuring",
+    "friendly": "warm, approachable, and helpful",
+    "casual": "relaxed, conversational, and concise",
+    "luxury": "polished, attentive, and premium",
+    "sales": "energetic, helpful, and gently conversion-focused",
 }
 
 _ENGLISH_ONLY_REPLY_NOTE = (
@@ -122,6 +149,7 @@ _CLUSTER_INSTRUCTION = (
     "existing cluster's label_en/label_km unchanged."
 )
 
+## ========== cluster unanswered questions ==========
 async def cluster_questions(
     existing_clusters: list[dict], new_questions: list[dict]
 ) -> Optional[list[dict]]:
@@ -134,10 +162,14 @@ async def cluster_questions(
     Returns the raw "clusters" list from the model, or None on failure — the
     caller should treat that business as unclustered this run and retry next time.
     """
+
+    ## Build the prompt for Groq
     prompt = json.dumps(
         {"existing_clusters": existing_clusters, "new_questions": new_questions},
         ensure_ascii=False,
     )
+
+    
     try:
         response = await _client.chat.completions.create(
             model=settings.ai_model,
@@ -184,7 +216,13 @@ _EXTRACT_INSTRUCTION = (
     "business information, output an empty items list."
 )
 
-async def extract_knowledge_items(text: str) -> Optional[list[dict]]:
+## ========= extract knowledge items from raw text ==========
+def _template_extraction_hint(business_type: str) -> str:
+    from app.services.knowledge_templates import get_templates
+    return f"\n\nIndustry-specific extraction guidance: {get_templates(business_type)['extractor_hint']}."
+
+## ======== extract knowledge items from raw text ==========
+async def extract_knowledge_items(text: str, business_type: str = "professional_other") -> Optional[list[dict]]:
     """Quick-add with AI: turn pasted raw text into draft knowledge items for
     the owner to review — nothing is persisted here, this only returns drafts.
 
@@ -195,7 +233,7 @@ async def extract_knowledge_items(text: str) -> Optional[list[dict]]:
         response = await _client.chat.completions.create(
             model=settings.ai_model,
             messages=[
-                {"role": "system", "content": _EXTRACT_INSTRUCTION},
+                {"role": "system", "content": _EXTRACT_INSTRUCTION + _template_extraction_hint(business_type)},
                 {"role": "user", "content": text},
             ],
             response_format={"type": "json_object"},
@@ -215,20 +253,30 @@ async def extract_knowledge_items(text: str) -> Optional[list[dict]]:
     return cleaned
 
 
+## ======== system prompt assembly for a business's AI assistant ==========
 def _build_system_instruction(business: Business, db: Session, handoff_active: bool) -> str:
-    """Combine the shared personality rules with this business's tone,
-    display name, and knowledge_items.
-    """
-    knowledge_items = conversation_state.get_knowledge_items(db, business.id)
-    business_info = build_business_info_text(knowledge_items)
+    """Build and log the exact per-business system prompt sent to the model."""
+    business_info = _get_cached_business_info(db, business.id)
+    profile = db.query(AIProfile).filter(AIProfile.business_id == business.id).first()
+    rules = db.query(BusinessRule).filter(
+        BusinessRule.business_id == business.id, BusinessRule.is_active.is_(True)
+    ).order_by(BusinessRule.sort_order, BusinessRule.id).all()
 
-    intro = (
-        f"You are '{business.assistant_display_name}', the customer assistant for this business.\n\n"
-        if business.assistant_display_name
-        else ""
-    )
-    instruction = f"{intro}{_RULES_TEXT}"
+    instruction = _RULES_TEXT
+    if profile:
+        instruction += (
+            f"\n\n## AI Profile\nYou are '{profile.assistant_name}', {profile.assistant_role}.\n"
+            f"Your personality is {_PERSONALITY_INSTRUCTIONS.get(profile.personality.value, profile.personality.value)}.\n"
+            f"Keep responses {profile.response_length} and use {profile.language_mode} language behavior."
+        )
+    elif business.assistant_display_name:
+        instruction += f"\n\nYou are '{business.assistant_display_name}', the customer assistant for this business."
     instruction += _ENGLISH_ONLY_REPLY_NOTE
+    from app.services.knowledge_templates import get_templates
+    template = get_templates(business.business_type.value)
+    instruction += f"\n\n## Industry guidance\nUse a {template['tone']} tone appropriate for this business type."
+    if rules:
+        instruction += "\n\n## Business Rules\n" + "\n".join(f"- {rule.rule_text}" for rule in rules)
     instruction += _TONE_INSTRUCTIONS.get(business.tone.value, "")
     instruction += (
         "\n\n## Business Information (your ONLY source of facts — never use anything else)\n\n"
@@ -236,16 +284,18 @@ def _build_system_instruction(business: Business, db: Session, handoff_active: b
     )
     if handoff_active:
         instruction += _HANDOFF_ALREADY_ACTIVE_NOTE
+    logger.debug("assembled_system_prompt business_id=%s prompt=%s", business.id, instruction)
     return instruction
 
 
+## ======== conversation history -> Groq message format ==========
 def _to_contents(messages) -> list[dict[str, str]]:
     return [
         {"role": _GROQ_ROLE[m.direction.value], "content": m.text}
         for m in messages
     ]
 
-
+## ======== generate reply the customer sees, then classify for lead/handoff ==========
 async def _generate_reply(contents: list[dict[str, str]], system_instruction: str) -> str:
     """Generate the customer-facing reply. Retries once after a short delay on failure."""
     messages = [{"role": "system", "content": system_instruction}, *contents]
@@ -262,6 +312,7 @@ async def _generate_reply(contents: list[dict[str, str]], system_instruction: st
     return (response.choices[0].message.content or "").strip() or FALLBACK_REPLY
 
 
+## ======== classify for lead/handoff ==========
 async def _classify(contents: list[dict[str, str]], assistant_reply: str) -> Optional[dict]:
     """Silently classify the exchange for lead/handoff signals (never shown to the customer)."""
     classifier_contents = contents + [
@@ -285,6 +336,7 @@ async def _classify(contents: list[dict[str, str]], assistant_reply: str) -> Opt
         return None
 
 
+## ======== apply conversation flags based on classification ==========
 def _apply_conversation_flags(
     business_id: int,
     chat_id: int,
@@ -316,10 +368,11 @@ def _apply_conversation_flags(
     conversation_state.reset_unanswered_streak(business_id, chat_id)
     return None
 
-
+## ======== get AI reply for a customer message ==========
 async def get_ai_reply(
     db: Session, business_id: int, chat_id: int, user_message: str
 ) -> tuple[str, Optional[dict], Optional[str], Conversation]:
+    
     """Send the customer's message (with recent DB history) to Groq.
 
     Returns (reply_text, lead, handoff_reason, conversation):
@@ -356,6 +409,7 @@ async def get_ai_reply(
     return reply, lead, handoff_reason, conversation
 
 
+## ======== preview reply for onboarding test-chat ==========
 async def generate_preview_reply(
     db: Session, business_id: int, history: list[dict], user_message: str
 ) -> str:

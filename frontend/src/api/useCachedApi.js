@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { apiFetch, getCachedApiData } from "./client";
 
 export function useCachedApi(path, fallbackData) {
-  const cached = getCachedApiData(path);
+  const cached = path ? getCachedApiData(path) : undefined;
   const [data, setData] = useState(cached !== undefined ? cached : fallbackData);
   const [loading, setLoading] = useState(cached === undefined);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!path) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     const cachedData = getCachedApiData(path);
 

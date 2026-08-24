@@ -28,7 +28,10 @@ export default function GapsCard({ showToast }) {
   }
 
   useEffect(() => {
-    load();
+    const schedule = window.requestIdleCallback || ((callback) => window.setTimeout(callback, 0));
+    const cancel = window.cancelIdleCallback || window.clearTimeout;
+    const task = schedule(() => load());
+    return () => cancel(task);
   }, []);
 
   function handleFixed(clusterId, label) {
@@ -45,7 +48,7 @@ export default function GapsCard({ showToast }) {
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
       <h2 className="font-heading font-bold text-ink">
         Customers asked about things you have no answer for
       </h2>

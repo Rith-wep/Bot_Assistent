@@ -15,8 +15,9 @@ a self-service web platform.
 
 ## Current implementation status
 
-Core build steps 1-7 are implemented. Weekly Intelligence parts 1-5 and the
-AI-assisted knowledge import are also implemented. The internal admin page is a
+Core build steps 1-7 are implemented. Weekly Intelligence parts 1-5, industry
+templates, AI Profiles, Business Rules, and the AI-assisted knowledge import
+are also implemented. The internal admin page is a
 read-only business list with status, plan, open-gap count, and last-summary time;
 mark-paid and pause-account actions are not implemented. Dashboard headline
 metrics and chart data remain partly mocked. Railway deployment is not yet
@@ -48,8 +49,10 @@ business_id scope is a bug, even if it "works."
   (one per business) from one process.
 - **AI:** provider-agnostic module (currently Groq API; must be swappable to
   Claude/other by config). All AI logic stays isolated in one module.
-- **Auth:** email + password with secure hashing (bcrypt/argon2), session or
-  JWT — pick the simplest secure standard. Google OAuth is a later add-on.
+- **Auth:** Supabase Auth is the current implementation. The frontend uses
+  Supabase email/password sessions and access tokens; the FastAPI backend
+  validates bearer tokens, resolves the local user/business identity, and
+  scopes all protected data to that business. Google OAuth is a later add-on.
 - **Hosting:** Railway (web service + Postgres). No Docker orchestration, no
   microservices, no message queues. Monolith until pain proves otherwise.
 
@@ -58,7 +61,8 @@ business_id scope is a bug, even if it "works."
 All tenant-owned tables include business_id (FK, indexed, part of uniqueness
 where relevant).
 
-- **businesses**: id, name, business_type (clinic/shop/real_estate/other),
+- **businesses**: id, name, business_type (service_appointment/product_retail/
+  food_beverage/property_real_estate/education/professional_other), logo_url,
   default_language, plan (trial/basic/standard/premium), status
   (active/paused/cancelled), created_at
 - **users**: id, business_id, email (unique), password_hash, role (owner/staff),
@@ -75,6 +79,10 @@ where relevant).
   text, created_at
 - **leads**: id, business_id, conversation_id, customer_name, phone, interest,
   created_at, notified_owner (bool)
+- **ai_profiles**: id, business_id (unique FK), assistant_name, assistant_role,
+  personality (professional/friendly/casual/luxury/sales), language_mode,
+  response_length, bilingual greeting and fallback messages
+- **business_rules**: id, business_id, rule_text, is_active, sort_order
 
 Composite indexes on (business_id, created_at) style lookups. Bot tokens are
 secrets: encrypt at rest, never log them, never return them fully via API
@@ -358,6 +366,46 @@ Do not skip ahead. After each step, give me manual test instructions
 - Secrets only via environment variables; .env in .gitignore; customer data
   (DB dumps, logs, exports) never committed.
 - Log conversations and errors with business_id context.
+
+## Current feature notes
+
+### Industry templates
+
+Template configuration lives in `app/services/knowledge_templates.py`, not in
+UI components. Each template defines starter knowledge hints, bilingual FAQ
+suggestions, tone, AI extractor guidance, default personality, assistant role,
+and starter business rules. `professional_other` is the generic fallback and
+must never block signup for an unmatched business type.
+
+### AI Profile and Business Rules
+
+`app/services/ai.py` assembles each business prompt from shared engine rules,
+the business AI Profile, active ordered Business Rules, knowledge items, and
+conversation history. Business-specific personality, tone, role, and rules are
+layered on top of the shared rules. Keep this assembly isolated and logged with
+business context for debugging.
+
+The onboarding wizard provides template defaults. Settings provides post-
+onboarding editing for the AI Profile and Business Rules.
+
+### Branding and lead capture
+
+Business logos upload directly to Cloudinary using a restricted unsigned upload
+preset. The backend stores only the returned `secure_url` in `businesses.logo_url`.
+The dashboard uses that URL and falls back to the product logo when absent.
+`/api/auth/bootstrap` must return `logo_url` so branding survives refresh.
+
+Lead capture is idempotent within a conversation: repeated classifier results
+for the same phone must not create duplicate rows. Preserve the guard in
+`app/services/leads.py` and `app/repositories/lead.py`.
+
+### Frontend request behavior
+
+Protected requests wait for Supabase session restoration. The app shell checks
+onboarding status outside `/app/onboarding`; the onboarding page owns its own
+status request to avoid duplicate calls. A `401` generally indicates an expired
+or missing Supabase access token and should not be treated as an onboarding
+business-state response.
 
 ## What NOT to do in v2
 

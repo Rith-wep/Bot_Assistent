@@ -3,12 +3,12 @@ landing page's live demo (app/routers/demo.py). Idempotent — safe to run
 more than once; skips if a demo business already exists.
 
 Run:
-    python scripts/seed_demo_business.py
+    python scripts/seed/seed_demo_business.py
 """
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.db.session import SessionLocal
 from app.models.business import AssistantTone, Business, BusinessStatus, BusinessType
@@ -104,7 +104,7 @@ def main() -> None:
 
         business = Business(
             name=BUSINESS_NAME,
-            business_type=BusinessType.clinic,
+            business_type=BusinessType.service_appointment,
             default_language="both",
             status=BusinessStatus.active,
             is_demo=True,

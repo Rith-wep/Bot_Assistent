@@ -35,7 +35,7 @@ export default function TelegramSection({ telegram, onSaved, showToast }) {
     setConnecting(true);
     try {
       await apiFetch("/onboarding/telegram/connect", { method: "POST", body: { token: token.trim() } });
-      const updated = await apiFetch("/settings");
+      const updated = await apiFetch("/settings/core");
       onSaved(updated.telegram);
       setToken("");
       setValidation(null);

@@ -19,6 +19,10 @@ export default function ResetPassword() {
     }
     setLoading(true);
     try {
+      const { data: sessionData } = await getSupabase().auth.getSession();
+      if (!sessionData.session) {
+        throw new Error("This password reset link has expired. Please request a new one.");
+      }
       const { error: updateError } = await getSupabase().auth.updateUser({ password });
       if (updateError) throw updateError;
       navigate("/app");

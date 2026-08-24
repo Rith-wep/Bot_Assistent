@@ -1,4 +1,5 @@
 import uuid
+import logging
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -11,6 +12,7 @@ from app.models.user import User
 from app.repositories.user import get_user_by_supabase_id
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/signin")
+logger = logging.getLogger(__name__)
 
 _INVALID_TOKEN = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -40,7 +42,8 @@ def get_supabase_identity(token: str = Depends(oauth2_scheme)) -> SupabaseIdenti
         metadata = payload.get("user_metadata") or {}
         if not email:
             raise ValueError("missing email")
-    except Exception:
+    except Exception as exc:
+        logger.warning("Supabase access token rejected: %s", exc.__class__.__name__)
         raise _INVALID_TOKEN
 
     return SupabaseIdentity(
@@ -58,6 +61,7 @@ def get_current_user(
     # so a deleted user or business reassignment can't still act as this user.
     user = get_user_by_supabase_id(db, identity.user_id)
     if user is None:
+        logger.warning("Supabase identity has no local user: %s", identity.user_id)
         raise _INVALID_TOKEN
 
     return CurrentUser(user_id=user.id, business_id=user.business_id)

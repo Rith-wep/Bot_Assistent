@@ -60,6 +60,7 @@ export default function SignIn() {
             <input
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-lg border border-shell-border bg-base px-3 py-2.5 text-sm text-shell-text placeholder-shell-text-muted/60 transition-colors duration-150 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -74,6 +75,7 @@ export default function SignIn() {
             <input
               type="password"
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-lg border border-shell-border bg-base px-3 py-2.5 text-sm text-shell-text placeholder-shell-text-muted/60 transition-colors duration-150 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"

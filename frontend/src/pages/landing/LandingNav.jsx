@@ -18,7 +18,11 @@ export default function LandingNav() {
           className="flex items-center gap-1 rounded-xl border border-gray-300 bg-white px-1.5 py-1 shadow-md sm:gap-2 sm:px-3 sm:py-1.5"
           aria-label="WeCare home"
         >
-          <Logo className="h-9 w-14 sm:h-12 sm:w-20" />
+          <Logo
+            width="80"
+            height="48"
+            className="block h-9 w-14 max-w-full object-contain sm:h-12 sm:w-20"
+          />
           <span className="font-sans text-lg font-bold tracking-tight sm:text-2xl">
             <span className="text-accent">We</span>
             <span className="text-slate-500">Care</span>

@@ -99,8 +99,8 @@ export default function Step3Telegram({ onAdvance }) {
   if (telegramStatus?.owner_linked) {
     return (
       <div>
-        <h1 className="font-heading text-2xl font-bold text-ink">Telegram connected</h1>
-        <div className="mt-6 flex flex-col items-center rounded-xl border border-gray-200 bg-white p-8 text-center">
+        <h1 className="font-heading text-2xl font-bold tracking-tight text-ink sm:text-3xl">Telegram connected</h1>
+        <div className="mt-6 flex flex-col items-center rounded-2xl border border-accent/25 bg-white p-8 text-center shadow-sm">
           <CheckCircle2 className="h-10 w-10 text-accent" strokeWidth={1.5} />
           <p className="mt-3 font-heading font-bold text-ink">@{telegramStatus.bot_username}</p>
           <p className="mt-1 text-sm text-ink-muted">You're linked as the owner of this bot.</p>
@@ -118,13 +118,13 @@ export default function Step3Telegram({ onAdvance }) {
   if (telegramStatus?.connected) {
     return (
       <div>
-        <h1 className="font-heading text-2xl font-bold text-ink">Almost there</h1>
+        <h1 className="font-heading text-2xl font-bold tracking-tight text-ink sm:text-3xl">Almost there</h1>
         <p className="mt-1 text-sm text-ink-muted">
           Your bot <span className="font-semibold text-ink">@{telegramStatus.bot_username}</span> is
           connected and running.
         </p>
 
-        <div className="mt-6 flex flex-col items-center rounded-xl border border-gray-200 bg-white p-8 text-center">
+        <div className="mt-6 flex flex-col items-center rounded-2xl border border-accent/25 bg-white p-8 text-center shadow-sm">
           <Loader2 className="h-8 w-8 animate-spin text-accent" strokeWidth={2} />
           <p className="mt-4 font-medium text-ink">
             Now open your new bot and press <span className="font-bold">START</span>, then send{" "}
@@ -150,12 +150,12 @@ export default function Step3Telegram({ onAdvance }) {
   // Not connected yet: instructions + token entry
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-ink">Connect your Telegram bot</h1>
-      <p className="mt-1 text-sm text-ink-muted">
+      <h1 className="font-heading text-2xl font-bold tracking-tight text-ink sm:text-3xl">Connect your Telegram bot</h1>
+      <p className="mt-2 text-sm leading-6 text-ink-muted">
         Your assistant lives inside a Telegram bot that you create and own.
       </p>
 
-      <div className="mt-6 space-y-4 rounded-xl border border-gray-200 bg-white p-6">
+      <div className="mt-6 space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <InstructionStep number="1">
           Open{" "}
           <a
@@ -180,7 +180,7 @@ export default function Step3Telegram({ onAdvance }) {
         </InstructionStep>
       </div>
 
-      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+      <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <label className="mb-1 block text-sm font-medium text-ink">Bot token</label>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input

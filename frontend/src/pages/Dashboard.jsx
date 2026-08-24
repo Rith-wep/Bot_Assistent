@@ -1,5 +1,5 @@
 import { CreditCard, MessageSquare, Sparkles, UserPlus } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { useCachedApi } from "../api/useCachedApi";
@@ -17,16 +17,26 @@ const ConversationsChart = lazy(() => import("../components/ConversationsChart")
 function DashboardSkeleton() {
   return (
     <div>
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <Skeleton className="mb-5 h-5 w-56" />
+        <Skeleton className="mb-6 h-1.5 w-full" />
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center gap-4 border-t border-gray-100 py-4 first:border-t-0">
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+            <div className="flex-1"><Skeleton className="mb-2 h-4 w-40" /><Skeleton className="h-3 w-64" /></div>
+          </div>
+        ))}
+      </div>
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="rounded-xl border border-gray-200 bg-white p-5">
+          <div key={i} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
             <Skeleton className="mb-3 h-4 w-24" />
             <Skeleton className="h-7 w-16" />
           </div>
         ))}
       </div>
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <Skeleton className="h-60 w-full" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {[0, 1].map((i) => <div key={i} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"><Skeleton className="mb-5 h-5 w-48" /><Skeleton className="h-32 w-full" /></div>)}
       </div>
     </div>
   );
@@ -34,10 +44,24 @@ function DashboardSkeleton() {
 
 export default function Dashboard() {
   const [range, setRange] = useState("30d");
-  const path = `/dashboard/stats?range=${range}`;
-  const { data: stats, loading, error: loadError } = useCachedApi(path, null);
-  const error = loadError instanceof ApiError ? loadError.message : loadError;
+  const [activityEnabled, setActivityEnabled] = useState(false);
+  const { data: summary, loading: summaryLoading, error: summaryError } = useCachedApi("/dashboard/summary", null);
+  const activityPath = `/dashboard/activity?range=${range}`;
+  const { data: activity, error: activityError } = useCachedApi(
+    activityEnabled && summary?.has_activity ? activityPath : null,
+    null,
+  );
+  const stats = summary && { ...summary, ...(activity || { chart: [], recent_leads: [], recent_conversations: [] }) };
+  const loading = summaryLoading;
+  const error = (summaryError || activityError) instanceof ApiError ? (summaryError || activityError).message : (summaryError || activityError);
   const { toasts, addToast } = useToasts();
+
+  useEffect(() => {
+    const schedule = window.requestIdleCallback || ((callback) => window.setTimeout(callback, 0));
+    const cancel = window.cancelIdleCallback || window.clearTimeout;
+    const task = schedule(() => setActivityEnabled(true));
+    return () => cancel(task);
+  }, []);
 
   const checklistIncomplete =
     stats &&
@@ -109,22 +133,20 @@ export default function Dashboard() {
               />
             ) : (
               <>
-                <div className="mb-6 lg:mb-4">
-                  <GapsCard showToast={addToast} />
-                </div>
+                {activityEnabled && <div className="mb-6 lg:mb-4"><GapsCard showToast={addToast} /></div>}
 
                 <Suspense
                   fallback={
-                    <div className="rounded-xl border border-gray-200 bg-white p-5">
+                    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                       <Skeleton className="h-60 w-full" />
                     </div>
                   }
                 >
-                  <ConversationsChart data={stats.chart} range={range} onRangeChange={setRange} />
+                  {activity ? <ConversationsChart data={stats.chart} range={range} onRangeChange={setRange} /> : <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"><Skeleton className="h-60 w-full" /></div>}
                 </Suspense>
 
                 <div className="mt-6 lg:mt-4 grid grid-cols-1 gap-6 lg:gap-4 lg:grid-cols-2">
-                  <div className="rounded-xl border border-gray-200 bg-white p-5 lg:p-4">
+                  <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm lg:p-4">
                     <div className="mb-3 flex items-center justify-between">
                       <h2 className="font-heading font-bold text-ink">Recent leads</h2>
                       <Link
@@ -155,7 +177,7 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="rounded-xl border border-gray-200 bg-white p-5 lg:p-4">
+                  <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm lg:p-4">
                     <div className="mb-3 flex items-center justify-between">
                       <h2 className="font-heading font-bold text-ink">Recent conversations</h2>
                       <Link

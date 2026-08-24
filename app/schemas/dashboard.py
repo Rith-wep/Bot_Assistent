@@ -54,3 +54,20 @@ class DashboardStats(BaseModel):
     recent_leads: list[RecentLead]
     recent_conversations: list[RecentConversation]
     checklist: ChecklistStatus
+
+
+class DashboardSummary(BaseModel):
+    has_activity: bool
+    bot_username: str | None
+    total_conversations: StatCard
+    new_leads: StatCard
+    messages_ai_handled: StatCard
+    messages_escalated: StatCard
+    payments: PaymentsStat
+    checklist: ChecklistStatus
+
+
+class DashboardActivity(BaseModel):
+    chart: list[ChartPoint]
+    recent_leads: list[RecentLead]
+    recent_conversations: list[RecentConversation]

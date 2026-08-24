@@ -6,7 +6,7 @@ out" screen already uses (app.services.ai.generate_preview_reply):
 nothing is written to conversations/messages/leads and no owner
 notifications fire, so the demo is fully isolated from real tenants by
 construction — not just by convention. It only ever talks to the single
-seeded Business.is_demo=True row (scripts/seed_demo_business.py).
+seeded Business.is_demo=True row (scripts/seed/seed_demo_business.py).
 
 Rate limiting is a simple in-process sliding window keyed by client IP —
 no new infra (Redis etc.) for a monolith at this scale. This means it

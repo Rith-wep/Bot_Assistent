@@ -1,39 +1,18 @@
 import { ArrowLeft } from "lucide-react";
-import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiFetch, ApiError } from "../api/client";
+import { ApiError } from "../api/client";
+import { useCachedApi } from "../api/useCachedApi";
 import { formatDate } from "../utils/format";
 
 export default function ConversationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [conversation, setConversation] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const data = await apiFetch(`/conversations/${id}`);
-        if (!cancelled) setConversation(data);
-      } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof ApiError ? err.message : "Could not load this conversation."
-          );
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  const {
+    data: conversation,
+    loading,
+    error: loadError,
+  } = useCachedApi(id ? `/conversations/${id}` : null, null);
+  const error = loadError instanceof ApiError ? loadError.message : loadError;
 
   return (
     <div>

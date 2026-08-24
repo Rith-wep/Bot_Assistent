@@ -1,6 +1,8 @@
 import { getSupabase } from "../lib/supabase";
 
 const responseCache = new Map();
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+let accessTokenProvider = null;
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -10,12 +12,19 @@ export class ApiError extends Error {
 }
 
 async function authHeaders() {
+  const providedToken = accessTokenProvider?.();
+  if (providedToken) return { Authorization: `Bearer ${providedToken}` };
+
   const {
     data: { session },
     error,
   } = await getSupabase().auth.getSession();
   if (error || !session?.access_token) return {};
   return { Authorization: `Bearer ${session.access_token}` };
+}
+
+export function setAccessTokenProvider(provider) {
+  accessTokenProvider = provider;
 }
 
 function notifyUnauthorized() {
@@ -49,7 +58,7 @@ export async function apiFetch(path, { method = "GET", body, auth = true } = {})
   const headers = { "Content-Type": "application/json" };
   if (auth) Object.assign(headers, await authHeaders());
 
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_BASE_URL}/api${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
@@ -73,14 +82,15 @@ export async function apiFetch(path, { method = "GET", body, auth = true } = {})
   if (method === "GET") {
     responseCache.set(cacheKey(path, auth), data);
   } else {
-    invalidateApiCache();
+    const resource = `/${path.replace(/^\//, "").split("/")[0]}`;
+    invalidateApiCache(resource);
   }
 
   return data;
 }
 
 export async function downloadFile(path, filename) {
-  const response = await fetch(`/api${path}`, { headers: await authHeaders() });
+  const response = await fetch(`${API_BASE_URL}/api${path}`, { headers: await authHeaders() });
   if (!response.ok) {
     if (response.status === 401) notifyUnauthorized();
     throw new ApiError(`Download failed (${response.status})`, response.status);

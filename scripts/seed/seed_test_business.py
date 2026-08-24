@@ -3,7 +3,7 @@ tenant isolation (build step 3) can be proven against real, different data.
 
 Run interactively (prompts for the new bot's token and owner chat ID,
 so neither ends up in shell history):
-    python scripts/seed_test_business.py
+    python scripts/seed/seed_test_business.py
 """
 import sys
 from getpass import getpass

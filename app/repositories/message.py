@@ -7,10 +7,12 @@ from app.repositories.base import TenantRepository
 class MessageRepository(TenantRepository[Message]):
     model = Message
 
-    def list_for_conversation(self, conversation_id: int) -> list[Message]:
+    def list_for_conversation(self, conversation_id: int, limit: int | None = None) -> list[Message]:
+        query = self._scoped_query().filter(Message.conversation_id == conversation_id)
+        if limit is not None:
+            return list(reversed(query.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit).all()))
         return (
-            self._scoped_query()
-            .filter(Message.conversation_id == conversation_id)
+            query
             .order_by(Message.created_at)
             .all()
         )

@@ -57,7 +57,7 @@ export default function GettingStartedCard({ checklist }) {
 
   if (allDone) {
     return (
-      <div className="mb-6 lg:mb-4 flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft px-5 py-3.5">
+      <div className="mb-6 lg:mb-4 flex items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent-soft px-5 py-3.5">
         <div className="flex items-center gap-2.5">
           <PartyPopper className="h-5 w-5 text-accent-dark" strokeWidth={2} />
           <span className="font-heading font-bold text-accent-soft-text">Setup complete 🎉</span>
@@ -77,7 +77,7 @@ export default function GettingStartedCard({ checklist }) {
   }
 
   return (
-    <div className="mb-6 lg:mb-4 rounded-xl border border-gray-200 bg-white p-6">
+    <div className="mb-6 lg:mb-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
       <h2 className="font-heading font-bold text-ink">
         Getting started — {doneCount} of {steps.length} done
       </h2>

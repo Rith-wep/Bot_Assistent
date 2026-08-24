@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     migration_database_url: str | None = None
     supabase_url: str | None = None
     supabase_publishable_key: str | None = None
+    supabase_jwt_secret: str | None = None
     secret_key: str = "dev-secret-key-change-me"
     encryption_key: str
     groq_api_key: str | None = None
@@ -18,6 +19,10 @@ class Settings(BaseSettings):
     # see CLAUDE.md's "Internal admin page"). Not a role/schema change since
     # that page isn't fully built yet; this is the minimum needed to gate it.
     admin_emails: str = ""
+
+    @property
+    def allowed_frontend_origins(self) -> list[str]:
+        return [origin.strip().rstrip("/") for origin in self.frontend_url.split(",") if origin.strip()]
 
     @property
     def supabase_issuer(self) -> str:

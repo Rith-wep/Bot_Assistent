@@ -18,8 +18,14 @@ class Step1Request(BaseModel):
 
 
 class TemplatesResponse(BaseModel):
-    services: list[str]
-    faqs: list[str]
+    label: str
+    tone: str
+    default_personality: str
+    assistant_role: str
+    default_rules: list[str]
+    extractor_hint: str
+    starter_items: list[dict]
+    faqs: list[dict]
 
 
 class ValidateTokenRequest(BaseModel):

@@ -5,12 +5,12 @@
   --font-heading: "Plus Jakarta Sans", "Noto Sans Khmer", ui-sans-serif, system-ui, sans-serif;
 
   /* Dark shell (sidebar, auth pages) */
-  --color-base: #1e2130;
-  --color-surface: #282c3e;
-  --color-surface-hover: #323752;
-  --color-shell-border: #363b52;
+  --color-base: #1f2937;
+  --color-surface: #374151;
+  --color-surface-hover: #4b5563;
+  --color-shell-border: #4b5563;
   --color-shell-text: #f5f5f4;
-  --color-shell-text-muted: #9498ac;
+  --color-shell-text-muted: #d1d5db;
 
   /* Light content area — soft fresh-green tint (paler than accent-soft, so
      accent-soft badges/icon circles sitting on white cards still stand out) */

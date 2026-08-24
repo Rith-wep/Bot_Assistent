@@ -1,8 +1,9 @@
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.business import AssistantTone, BusinessType
+from app.models.ai_profile import Personality
 from app.schemas.common import UtcDatetime
 
 
@@ -52,6 +53,51 @@ class AiBehaviorUpdate(BaseModel):
     handoff_on_unsure: bool
 
 
+class AIProfileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    assistant_name: str
+    assistant_role: str
+    personality: Personality
+    language_mode: str
+    response_length: str
+    greeting_message_en: str | None
+    greeting_message_km: str | None
+    fallback_message_en: str | None
+    fallback_message_km: str | None
+
+
+class AIProfileUpdate(BaseModel):
+    assistant_name: str = Field(min_length=1, max_length=255)
+    assistant_role: str = Field(min_length=1, max_length=500)
+    personality: Personality
+    language_mode: str = Field(min_length=1, max_length=20)
+    response_length: str = Field(min_length=1, max_length=20)
+    greeting_message_en: str | None = None
+    greeting_message_km: str | None = None
+    fallback_message_en: str | None = None
+    fallback_message_km: str | None = None
+
+
+class BusinessRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    rule_text: str
+    is_active: bool
+    sort_order: int
+
+
+class BusinessRuleCreate(BaseModel):
+    rule_text: str = Field(min_length=1, max_length=500)
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class BusinessRuleUpdate(BaseModel):
+    rule_text: str | None = Field(default=None, min_length=1, max_length=500)
+    is_active: bool | None = None
+    sort_order: int | None = None
+
+
 class NotificationPrefsOut(BaseModel):
     notify_on_lead: bool
     notify_on_payment: bool
@@ -69,6 +115,20 @@ class SettingsOut(BaseModel):
     telegram: TelegramSettingsOut
     ai_behavior: AiBehaviorOut
     notifications: NotificationPrefsOut
+    ai_profile: AIProfileOut
+    business_rules: list[BusinessRuleOut]
+
+
+class SettingsCoreOut(BaseModel):
+    profile: ProfileOut
+    telegram: TelegramSettingsOut
+    ai_behavior: AiBehaviorOut
+    notifications: NotificationPrefsOut
+
+
+class SettingsAIProfileOut(BaseModel):
+    ai_profile: AIProfileOut
+    business_rules: list[BusinessRuleOut]
 
 
 class DeleteKnowledgeResponse(BaseModel):

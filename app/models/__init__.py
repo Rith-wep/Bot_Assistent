@@ -9,6 +9,8 @@ from app.models.message import Message
 from app.models.question_cluster import QuestionCluster
 from app.models.unanswered_question import UnansweredQuestion
 from app.models.user import User
+from app.models.ai_profile import AIProfile, Personality
+from app.models.business_rule import BusinessRule
 
 __all__ = [
     "Business",

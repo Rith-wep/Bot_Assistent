@@ -3,11 +3,22 @@ import { apiFetch, ApiError } from "../../api/client";
 import Button from "../../components/Button";
 
 const BUSINESS_TYPES = [
-  { value: "clinic", label: "Clinic" },
-  { value: "shop", label: "Shop" },
-  { value: "real_estate", label: "Real Estate" },
-  { value: "other", label: "Other" },
+  { value: "service_appointment", label: "Services and appointments" },
+  { value: "product_retail", label: "Product retail" },
+  { value: "food_beverage", label: "Food and beverage" },
+  { value: "property_real_estate", label: "Property and real estate" },
+  { value: "education", label: "Education" },
+  { value: "professional_other", label: "Professional or other" },
 ];
+
+const TEMPLATE_PREVIEWS = {
+  service_appointment: ["Main appointment", "Follow-up appointment", "Popular service", "Cancellation policy"],
+  product_retail: ["Best-selling product", "New arrival", "Product variant or size", "Return or exchange policy"],
+  food_beverage: ["Signature dish or drink", "Breakfast item", "Family or combo set", "Delivery area and fee"],
+  property_real_estate: ["Available listing", "Studio or one-bedroom", "Property sale listing", "Deposit and lease terms"],
+  education: ["Main course or class", "Beginner or foundation course", "Private tutoring session", "Class schedule and age range"],
+  professional_other: ["Main service", "Popular service", "Payment or cancellation policy", "What customers should know"],
+};
 
 const LANGUAGES = [
   { value: "km", label: "Khmer" },
@@ -48,14 +59,14 @@ export default function Step1Basics({ status, onAdvance }) {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-ink">Tell us about your business</h1>
-      <p className="mt-1 text-sm text-ink-muted">
+      <h1 className="font-heading text-2xl font-bold tracking-tight text-ink sm:text-3xl">Tell us about your business</h1>
+      <p className="mt-2 text-sm leading-6 text-ink-muted">
         This helps us set up your assistant with the right tone and suggestions.
       </p>
 
       <form
         onSubmit={handleSubmit}
-        className="mt-6 space-y-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
+        className="mt-7 space-y-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7"
       >
         {error && <p className="rounded-lg bg-error-soft px-3 py-2 text-sm text-error">{error}</p>}
 
@@ -83,6 +94,21 @@ export default function Step1Basics({ status, onAdvance }) {
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="rounded-2xl border border-accent/25 bg-accent-soft/40 px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-ink">Here's what we'll help you set up</p>
+          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-accent-dark">Preview</span>
+          </div>
+          <p className="mt-1 text-xs text-ink-muted">Starter knowledge for this template:</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {TEMPLATE_PREVIEWS[businessType].map((item) => (
+              <span key={item} className="rounded-md bg-white px-2 py-1 text-xs font-medium text-ink">
+                {item}
+              </span>
+            ))}
+          </div>
         </div>
 
         <div>

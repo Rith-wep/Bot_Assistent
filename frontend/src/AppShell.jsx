@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { apiFetch } from "./api/client";
 import Layout from "./components/Layout";
+import Skeleton from "./components/Skeleton";
 import { useAuth } from "./context/AuthContext";
 
 const Admin = lazy(() => import("./pages/admin/Admin"));
@@ -19,8 +20,55 @@ const SignUp = lazy(() => import("./pages/SignUp"));
 
 function RouteLoading() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-page">
-      <p className="text-sm text-ink-muted">Loading...</p>
+    <div className="min-h-screen bg-page">
+      <div className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
+        <Skeleton className="h-4 w-28" />
+        <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
+      </div>
+      <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10">
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <Skeleton className="h-9 w-48" />
+            <Skeleton className="mt-3 h-4 w-64" />
+          </div>
+          <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+            Loading workspace
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((item) => (
+            <div key={item} className="rounded-xl border border-gray-200 bg-white p-5">
+              <Skeleton className="mb-4 h-4 w-24" />
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="mt-3 h-3 w-28" />
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
+          <Skeleton className="mb-5 h-5 w-48" />
+          <Skeleton className="h-56 w-full" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PageLoading() {
+  return (
+    <div>
+      <div className="mb-6">
+        <Skeleton className="h-8 w-44" />
+        <Skeleton className="mt-3 h-4 w-64" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2].map((item) => (
+          <div key={item} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <Skeleton className="mb-4 h-4 w-28" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -73,7 +121,7 @@ export default function AppShell() {
 
   return (
     <Layout>
-      <Suspense fallback={<RouteLoading />}>
+      <Suspense fallback={<PageLoading />}>
         <Routes>
           {/* Relative paths: this <Routes> is itself rendered inside a
               parent <Route path="/app/*">, so paths here are matched
