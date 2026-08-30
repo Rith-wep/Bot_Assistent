@@ -17,6 +17,7 @@ separate:
 import asyncio
 import json
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Optional
@@ -25,11 +26,12 @@ from groq import AsyncGroq
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.business import Business
+from app.models.business import Business, BusinessType
 from app.models.ai_profile import AIProfile
 from app.models.business_rule import BusinessRule
 from app.models.conversation import Conversation
 from app.services import conversation_state, gaps
+from app.services.commerce import build_retail_prompt_context
 from app.services.knowledge import build_business_info_text
 
 logger = logging.getLogger(__name__)
@@ -188,6 +190,7 @@ async def cluster_questions(
 _KNOWLEDGE_CATEGORIES = ["service", "faq", "hours", "location", "policy", "other"]
 
 MAX_EXTRACT_ITEMS = 40
+MAX_EXTRACT_PRODUCTS = 30
 
 _EXTRACT_INSTRUCTION = (
     "Return one valid JSON object with an items array. You are helping a small "
@@ -214,6 +217,20 @@ _EXTRACT_INSTRUCTION = (
     "ai_generated flag to true. Never leave both content_en and content_km empty.\n\n"
     f"Output at most {MAX_EXTRACT_ITEMS} items. If the text contains no usable "
     "business information, output an empty items list."
+)
+
+_FAKE_IMAGE_MARKDOWN_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)", re.IGNORECASE)
+
+_PRODUCT_EXTRACT_INSTRUCTION = (
+    "Return one valid JSON object with a products array. Extract ecommerce "
+    "products from raw shop notes in English, Khmer, or mixed text. For each "
+    "product output: name_en, name_km, description_en, description_km, category, "
+    "base_price, photo_urls, is_active, sort_order, and variants. Each variant "
+    "must include variant_label, price_override, stock_quantity, sku, and "
+    "is_active. Expand clear combinations such as colors red/blue and sizes S-XL "
+    "into concrete variants like 'Red / S'. If stock is stated as '5 each', apply "
+    "that to each variant. Never invent products, prices, variants, images, or "
+    "stock. If stock is missing, use 0. Use numeric prices only."
 )
 
 ## ========= extract knowledge items from raw text ==========
@@ -253,6 +270,50 @@ async def extract_knowledge_items(text: str, business_type: str = "professional_
     return cleaned
 
 
+async def extract_products(text: str) -> Optional[list[dict]]:
+    """Quick-add with AI for retail catalogs; returns reviewed drafts only."""
+    try:
+        response = await _client.chat.completions.create(
+            model=settings.ai_model,
+            messages=[
+                {"role": "system", "content": _PRODUCT_EXTRACT_INSTRUCTION},
+                {"role": "user", "content": text},
+            ],
+            response_format={"type": "json_object"},
+        )
+        products = json.loads(response.choices[0].message.content or "{}")["products"]
+    except Exception:
+        logger.warning("Groq product extraction call failed", exc_info=True)
+        return None
+
+    cleaned = []
+    for index, product in enumerate(products[:MAX_EXTRACT_PRODUCTS]):
+        if not (product.get("name_en") or "").strip():
+            continue
+        product["base_price"] = product.get("base_price") or 0
+        product["photo_urls"] = [
+            url.strip() for url in product.get("photo_urls", []) if url and url.strip()
+        ][:8]
+        product["is_active"] = bool(product.get("is_active", True))
+        product["sort_order"] = int(product.get("sort_order") or index)
+        variants = []
+        for variant in product.get("variants", []):
+            if not (variant.get("variant_label") or "").strip():
+                continue
+            variants.append(
+                {
+                    "variant_label": variant["variant_label"],
+                    "price_override": variant.get("price_override"),
+                    "stock_quantity": max(0, int(variant.get("stock_quantity") or 0)),
+                    "sku": variant.get("sku"),
+                    "is_active": bool(variant.get("is_active", True)),
+                }
+            )
+        product["variants"] = variants
+        cleaned.append(product)
+    return cleaned
+
+
 ## ======== system prompt assembly for a business's AI assistant ==========
 def _build_system_instruction(business: Business, db: Session, handoff_active: bool) -> str:
     """Build and log the exact per-business system prompt sent to the model."""
@@ -275,6 +336,28 @@ def _build_system_instruction(business: Business, db: Session, handoff_active: b
     from app.services.knowledge_templates import get_templates
     template = get_templates(business.business_type.value)
     instruction += f"\n\n## Industry guidance\nUse a {template['tone']} tone appropriate for this business type."
+    if business.business_type == BusinessType.product_retail:
+        instruction += (
+            "\n\n## Product retail order rules\n"
+            "Act as a sales assistant. Help customers browse products, describe "
+            "items, mention only variants with stock above 0 as available, ask "
+            "for quantity, delivery address, delivery zone, and payment method. "
+            "Suggest COD by default. Never promise a variant that has stock 0. "
+            "If product, variant, stock, address, or delivery zone matching is "
+            "ambiguous, ask a short confirmation question instead of guessing. "
+            "Do not tell the customer an order is created until all details are "
+            "confirmed. Product photos can be sent by this Telegram channel when "
+            "the catalog says photos are available, so never say you cannot send "
+            "photos for those products. If the customer asks to see products or "
+            "photos, briefly introduce the matching product(s) and say you will "
+            "show the available photo(s). If photos are not uploaded for a product, "
+            "say that no photo is saved yet and give a short description instead. "
+            "Do not write placeholders like '(image)', '[photo]', or fake image links; "
+            "do not use Markdown image syntax like ![name](attachment://file.jpg) "
+            "or ![name](https://example.com/file.jpg); "
+            "the channel sends real photo attachments separately."
+            f"\n\n{build_retail_prompt_context(db, business.id)}"
+        )
     if rules:
         instruction += "\n\n## Business Rules\n" + "\n".join(f"- {rule.rule_text}" for rule in rules)
     instruction += _TONE_INSTRUCTIONS.get(business.tone.value, "")
@@ -309,7 +392,8 @@ async def _generate_reply(contents: list[dict[str, str]], system_instruction: st
         response = await _client.chat.completions.create(
             model=settings.ai_model, messages=messages
         )
-    return (response.choices[0].message.content or "").strip() or FALLBACK_REPLY
+    reply = (response.choices[0].message.content or "").strip() or FALLBACK_REPLY
+    return _FAKE_IMAGE_MARKDOWN_RE.sub("", reply).strip() or FALLBACK_REPLY
 
 
 ## ======== classify for lead/handoff ==========
@@ -333,6 +417,40 @@ async def _classify(contents: list[dict[str, str]], assistant_reply: str) -> Opt
             "Groq classification call failed; skipping lead/handoff detection for this message",
             exc_info=True,
         )
+        return None
+
+
+_RETAIL_CLASSIFIER_INSTRUCTION = (
+    "You are an internal order classifier for a product retail chat. Output one "
+    "valid JSON object with keys mentioned_product_ids, cart_patch, and "
+    "confirmed_order. cart_patch should contain only details the customer clearly "
+    "provided or changed in this turn: items [{product_id, variant_id, qty}], "
+    "delivery_zone_id, delivery_address_text, customer_name, phone, and "
+    "payment_method cod/prepaid. Use cart_patch to update an existing cart; do "
+    "not restart from scratch just because the customer changes size or quantity. "
+    "Set confirmed_order=true only when the customer clearly confirms they want "
+    "to place the order after product/variant/quantity/address/payment are known. "
+    "Never guess IDs; use null or omit fields if ambiguous. Include mentioned_product_ids as an "
+    "array of product IDs the assistant discussed so the channel can send photos. "
+    "If the customer asks to see products, see photos, browse, or asks what products "
+    "are available, include the IDs of the relevant products the assistant described."
+)
+
+
+async def _classify_retail(contents: list[dict[str, str]], assistant_reply: str) -> Optional[dict]:
+    classifier_contents = contents + [{"role": "assistant", "content": assistant_reply}]
+    try:
+        response = await _client.chat.completions.create(
+            model=settings.ai_model,
+            messages=[
+                {"role": "system", "content": _RETAIL_CLASSIFIER_INSTRUCTION},
+                *classifier_contents,
+            ],
+            response_format={"type": "json_object"},
+        )
+        return json.loads(response.choices[0].message.content or "{}")
+    except Exception:
+        logger.warning("Groq retail classification call failed", exc_info=True)
         return None
 
 
@@ -371,11 +489,11 @@ def _apply_conversation_flags(
 ## ======== get AI reply for a customer message ==========
 async def get_ai_reply(
     db: Session, business_id: int, chat_id: int, user_message: str
-) -> tuple[str, Optional[dict], Optional[str], Conversation]:
+) -> tuple[str, Optional[dict], Optional[str], Conversation, Optional[dict]]:
     
     """Send the customer's message (with recent DB history) to Groq.
 
-    Returns (reply_text, lead, handoff_reason, conversation):
+    Returns (reply_text, lead, handoff_reason, conversation, commerce):
     - lead: a dict with name/phone/interest if a complete lead was just detected, else None.
     - handoff_reason: a short string if this turn should escalate to a human, else None.
     """
@@ -391,13 +509,19 @@ async def get_ai_reply(
         reply = await _generate_reply(contents, system_instruction)
     except Exception:
         logger.exception("business_id=%s chat_id=%s: get_ai_reply failed", business_id, chat_id)
-        return FALLBACK_REPLY, None, None, conversation
+        return FALLBACK_REPLY, None, None, conversation, None
 
     conversation_state.add_message(db, business_id, conversation.id, "customer", user_message)
     conversation_state.add_message(db, business_id, conversation.id, "bot", reply)
 
-    classification = await _classify(contents, reply)
-    lead = classification.get("lead") if classification else None
+    commerce = None
+    if business.business_type == BusinessType.product_retail:
+        classification = await _classify_retail(contents, reply)
+        lead = None
+        commerce = classification if classification else None
+    else:
+        classification = await _classify(contents, reply)
+        lead = classification.get("lead") if classification else None
 
     if classification and classification.get("could_not_answer"):
         gaps.record_unanswered_question(db, business_id, conversation.id, user_message)
@@ -406,7 +530,7 @@ async def get_ai_reply(
         business_id, chat_id, conversation, classification, business.handoff_on_unsure
     )
 
-    return reply, lead, handoff_reason, conversation
+    return reply, lead, handoff_reason, conversation, commerce
 
 
 ## ======== preview reply for onboarding test-chat ==========

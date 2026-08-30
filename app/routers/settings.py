@@ -10,9 +10,13 @@ from app.models.business_rule import BusinessRule
 from app.models.bot_config import BotConfig
 from app.models.business import Business
 from app.models.conversation import Conversation
+from app.models.conversation_cart import ConversationCart
 from app.models.knowledge_item import KnowledgeItem
 from app.models.lead import Lead
 from app.models.message import Message
+from app.models.delivery_zone import DeliveryZone
+from app.models.order import Order
+from app.models.product import Product, ProductVariant
 from app.models.user import User
 from app.repositories.bot_config import BotConfigRepository
 from app.repositories.knowledge_item import KnowledgeItemRepository
@@ -286,6 +290,12 @@ def delete_account(
     db.query(Lead).filter(Lead.conversation_id.in_(conversation_ids)).delete(
         synchronize_session=False
     )
+    db.query(Order).filter(Order.conversation_id.in_(conversation_ids)).delete(
+        synchronize_session=False
+    )
+    db.query(ConversationCart).filter(ConversationCart.conversation_id.in_(conversation_ids)).delete(
+        synchronize_session=False
+    )
     db.query(Message).filter(Message.conversation_id.in_(conversation_ids)).delete(
         synchronize_session=False
     )
@@ -293,6 +303,15 @@ def delete_account(
         synchronize_session=False
     )
     db.query(KnowledgeItem).filter(KnowledgeItem.business_id == business_id).delete(
+        synchronize_session=False
+    )
+    product_ids = [p.id for p in db.query(Product).filter(Product.business_id == business_id).all()]
+    if product_ids:
+        db.query(ProductVariant).filter(ProductVariant.product_id.in_(product_ids)).delete(
+            synchronize_session=False
+        )
+    db.query(Product).filter(Product.business_id == business_id).delete(synchronize_session=False)
+    db.query(DeliveryZone).filter(DeliveryZone.business_id == business_id).delete(
         synchronize_session=False
     )
     db.query(BotConfig).filter(BotConfig.business_id == business_id).delete(

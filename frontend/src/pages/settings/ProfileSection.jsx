@@ -225,36 +225,40 @@ export default function ProfileSection({ profile, onSaved, showToast }) {
 
       <div>
         <label className={labelClass}>Business hours</label>
-        <div className="space-y-2 rounded-lg border border-gray-200 p-3">
+        <div className="grid gap-2 rounded-xl border border-gray-100 bg-gray-50/50 p-3 lg:grid-cols-2">
           {DAYS.map(([key, label]) => {
             const day = form.business_hours[key] || { open: "08:00", close: "17:00", closed: false };
             return (
-              <div key={key} className="flex flex-wrap items-center gap-3">
-                <span className="w-24 shrink-0 text-sm text-ink">{label}</span>
-                <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+              <div key={key} className="grid grid-cols-[88px_auto_1fr] items-center gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2">
+                <span className="shrink-0 text-sm font-medium text-ink">{label}</span>
+                <label className="relative inline-flex cursor-pointer items-center">
                   <input
                     type="checkbox"
                     checked={day.closed}
                     onChange={(e) => updateHours(key, "closed", e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent"
+                    className="peer sr-only"
                   />
-                  Closed
+                  <span className="h-5 w-9 rounded-full bg-accent transition-colors duration-150 peer-checked:bg-gray-300 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform after:content-[''] peer-checked:after:translate-x-4" />
                 </label>
-                {!day.closed && (
+                {day.closed ? (
+                  <span className="text-sm text-gray-400">Closed</span>
+                ) : (
                   <>
-                    <input
-                      type="time"
-                      value={day.open || ""}
-                      onChange={(e) => updateHours(key, "open", e.target.value)}
-                      className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                    />
-                    <span className="text-sm text-ink-muted">to</span>
-                    <input
-                      type="time"
-                      value={day.close || ""}
-                      onChange={(e) => updateHours(key, "close", e.target.value)}
-                      className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                    />
+                    <div className="grid min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-2">
+                      <input
+                        type="time"
+                        value={day.open || ""}
+                        onChange={(e) => updateHours(key, "open", e.target.value)}
+                        className="min-w-0 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      />
+                      <span className="text-xs text-ink-muted">to</span>
+                      <input
+                        type="time"
+                        value={day.close || ""}
+                        onChange={(e) => updateHours(key, "close", e.target.value)}
+                        className="min-w-0 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      />
+                    </div>
                   </>
                 )}
               </div>

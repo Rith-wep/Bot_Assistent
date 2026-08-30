@@ -15,7 +15,9 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentUser, get_current_user
 from app.db.session import get_db
-from app.models.business import Business
+from app.models.business import Business, BusinessType
+from app.repositories.order import OrderRepository
+from app.repositories.product import ProductRepository
 from app.repositories.bot_config import BotConfigRepository
 from app.repositories.conversation import ConversationRepository
 from app.repositories.knowledge_item import KnowledgeItemRepository
@@ -61,7 +63,13 @@ def _summary(db: Session, business_id: int) -> DashboardSummary:
     conversation_repo = ConversationRepository(db, business_id)
     bot_config = BotConfigRepository(db, business_id).get_for_business()
     _, real_total = conversation_repo.list_paginated(1, 1)
-    knowledge_added = KnowledgeItemRepository(db, business_id).exists()
+    business = db.get(Business, business_id)
+    is_retail = business is not None and business.business_type == BusinessType.product_retail
+    knowledge_added = (
+        len(ProductRepository(db, business_id).list_ordered(active_only=True)) > 0
+        if is_retail
+        else KnowledgeItemRepository(db, business_id).exists()
+    )
     telegram_connected = bot_config is not None and bot_config.is_active
     has_activity = real_total > 0
     if not has_activity:
@@ -91,16 +99,24 @@ def get_dashboard_activity(
     db: Session = Depends(get_db),
 ) -> DashboardActivity:
     business_id = current_user.business_id
+    business = db.get(Business, business_id)
+    is_retail = business is not None and business.business_type == BusinessType.product_retail
     lead_repo = LeadRepository(db, business_id)
+    order_repo = OrderRepository(db, business_id)
     conversation_repo = ConversationRepository(db, business_id)
     recent_leads_data, _ = lead_repo.list_paginated(1, 5)
+    recent_orders_data, _ = order_repo.list_paginated(1, 5)
     recent_conversations_data, _ = conversation_repo.list_paginated(1, 5)
     latest_messages = MessageRepository(db, business_id).latest_for_conversations([c.id for c in recent_conversations_data])
-    business = db.get(Business, business_id)
     language = "km" if business.default_language in ("km", "both") else "en"
     return DashboardActivity(
         chart=_mock_chart(RANGE_DAYS[range], business_id),
-        recent_leads=[RecentLead(id=lead.id, name=lead.customer_name or "Unknown", phone=lead.phone or "", source="Telegram", created_at=lead.created_at) for lead in recent_leads_data],
+        recent_leads=[
+            RecentLead(id=order.id, name=order.customer_name or "Unknown", phone=order.phone or "", source=f"${order.grand_total}", created_at=order.created_at)
+            for order in recent_orders_data
+        ] if is_retail else [
+            RecentLead(id=lead.id, name=lead.customer_name or "Unknown", phone=lead.phone or "", source="Telegram", created_at=lead.created_at) for lead in recent_leads_data
+        ],
         recent_conversations=[RecentConversation(id=conv.id, customer_name=conv.customer_name or f"Customer #{conv.customer_chat_id}", last_message=_last_message_preview(latest_messages.get(conv.id)), language=language, last_message_at=conv.last_message_at) for conv in recent_conversations_data],
     )
 
@@ -121,7 +137,13 @@ def get_dashboard_stats(
     real_conversations, real_total = conversation_repo.list_paginated(1, 1)
     has_activity = real_total > 0
 
-    knowledge_added = KnowledgeItemRepository(db, business_id).exists()
+    business = db.get(Business, business_id)
+    is_retail = business is not None and business.business_type == BusinessType.product_retail
+    knowledge_added = (
+        len(ProductRepository(db, business_id).list_ordered(active_only=True)) > 0
+        if is_retail
+        else KnowledgeItemRepository(db, business_id).exists()
+    )
     telegram_connected = bot_config is not None and bot_config.is_active
 
     if not has_activity:

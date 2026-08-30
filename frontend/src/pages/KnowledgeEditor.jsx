@@ -12,8 +12,10 @@ import KnowledgeItemForm, {
 } from "../components/KnowledgeItemForm";
 import PageHeader from "../components/PageHeader";
 import { KnowledgeListSkeleton } from "../components/Skeleton";
+import { useAuth } from "../context/AuthContext";
+import Products from "./Products";
 
-export default function KnowledgeEditor() {
+function KnowledgeManager() {
   const {
     data: items,
     setData: setItems,
@@ -203,4 +205,9 @@ export default function KnowledgeEditor() {
       />
     </div>
   );
+}
+
+export default function KnowledgeEditor() {
+  const { businessType } = useAuth();
+  return businessType === "product_retail" ? <Products /> : <KnowledgeManager />;
 }

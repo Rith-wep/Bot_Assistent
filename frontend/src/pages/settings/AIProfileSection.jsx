@@ -14,7 +14,7 @@ const PERSONALITIES = [
 
 const fieldClass = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 
-export default function AIProfileSection({ profile, rules, onProfileSaved, onRulesSaved, showToast }) {
+export default function AIProfileSection({ profile, rules, onProfileSaved, onRulesSaved, showToast, embedded = false }) {
   const [form, setForm] = useState({ ...profile });
   const [newRule, setNewRule] = useState("");
   const [saving, setSaving] = useState(false);
@@ -44,7 +44,11 @@ export default function AIProfileSection({ profile, rules, onProfileSaved, onRul
     catch (err) { showToast(err instanceof ApiError ? err.message : "Could not remove rule.", "error"); }
   }
 
-  return <SectionCard title="AI profile and business rules" description="Shape how your assistant speaks and what it must always remember.">
+  const content = <>
+    <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-4">
+      <h3 className="font-heading text-sm font-bold text-gray-900">Persona and rules</h3>
+      <p className="mt-1 text-xs text-gray-500">Shape how your assistant speaks and what it must always remember.</p>
+    </div>
     <div>
       <label className="mb-1 block text-sm font-medium text-ink">Assistant name</label>
       <input className={fieldClass} value={form.assistant_name} onChange={(e) => update("assistant_name", e.target.value)} />
@@ -55,8 +59,8 @@ export default function AIProfileSection({ profile, rules, onProfileSaved, onRul
     </div>
     <div>
       <label className="mb-2 block text-sm font-medium text-ink">Personality</label>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {PERSONALITIES.map(([value, label, description]) => <button key={value} type="button" onClick={() => update("personality", value)} className={`rounded-lg border p-3 text-left ${form.personality === value ? "border-accent bg-accent-soft" : "border-gray-200 bg-white"}`}><span className="block text-sm font-semibold text-ink">{label}</span><span className="text-xs text-ink-muted">{description}</span></button>)}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {PERSONALITIES.map(([value, label, description]) => <button key={value} type="button" onClick={() => update("personality", value)} className={`min-h-24 rounded-xl border p-3 text-left transition-all duration-150 hover:-translate-y-px hover:shadow-sm ${form.personality === value ? "border-accent bg-accent-soft ring-1 ring-accent/20" : "border-gray-100 bg-white hover:border-gray-200"}`}><span className="block text-sm font-semibold text-ink">{label}</span><span className="mt-1 block text-xs text-ink-muted">{description}</span></button>)}
       </div>
     </div>
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -66,5 +70,7 @@ export default function AIProfileSection({ profile, rules, onProfileSaved, onRul
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><textarea className={fieldClass} rows={3} placeholder="Greeting in English" value={form.greeting_message_en || ""} onChange={(e) => update("greeting_message_en", e.target.value || null)} /><textarea className={fieldClass} rows={3} placeholder="Greeting in Khmer" value={form.greeting_message_km || ""} onChange={(e) => update("greeting_message_km", e.target.value || null)} /></div>
     <Button onClick={saveProfile} disabled={saving}>{saving ? "Saving..." : "Save AI profile"}</Button>
     <div className="border-t border-gray-200 pt-4"><h3 className="text-sm font-semibold text-ink">Business rules</h3><p className="mt-1 text-xs text-ink-muted">Active rules are included in the assistant prompt in this order.</p><div className="mt-3 space-y-2">{rules.map((rule) => <div key={rule.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2"><span className="text-sm text-ink">{rule.rule_text}</span><button type="button" onClick={() => removeRule(rule.id)} aria-label="Delete rule" className="text-ink-muted hover:text-error"><Trash2 className="h-4 w-4" /></button></div>)}</div><div className="mt-3 flex gap-2"><input className={fieldClass} value={newRule} onChange={(e) => setNewRule(e.target.value)} placeholder="e.g. Never mention competitor names" /><Button onClick={addRule}><Plus className="h-4 w-4" /> Add rule</Button></div></div>
-  </SectionCard>;
+  </>;
+
+  return embedded ? content : <SectionCard title="AI profile and business rules" description="Shape how your assistant speaks and what it must always remember.">{content}</SectionCard>;
 }

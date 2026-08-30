@@ -6,6 +6,7 @@ runs a single Application for one business.
 """
 import logging
 
+from fastapi import HTTPException
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
@@ -13,13 +14,44 @@ from app.core.time import utcnow
 from app.db.session import SessionLocal
 from app.models.bot_config import BotConfig
 from app.models.business import Business
+from app.models.product import Product
 from app.repositories.admin import AdminInviteRepository, AdminRepository
 from app.services import conversation_state, handoff, leads
+from app.services.commerce import (
+    cart_ready_for_order,
+    create_order_from_cart,
+    merge_cart_patch,
+    notify_order,
+)
+from app.services.exceptions import BusinessRuleError
 from app.services.ai import FALLBACK_REPLY, get_ai_reply
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_GREETING = "Hi! Send me a message and I'll do my best to help."
+_PHOTO_REQUEST_WORDS = ("photo", "picture", "image", "see", "show", "មើល", "រូប")
+
+
+def _looks_like_photo_request(text: str) -> bool:
+    lowered = text.lower()
+    return any(word in lowered for word in _PHOTO_REQUEST_WORDS)
+
+
+def _product_ids_for_photo_reply(db, business_id: int, message: str, commerce: dict | None) -> list[int]:
+    ids = list(dict.fromkeys((commerce or {}).get("mentioned_product_ids") or []))
+    if ids:
+        return ids[:3]
+    if not _looks_like_photo_request(message):
+        return []
+
+    products = (
+        db.query(Product)
+        .filter(Product.business_id == business_id, Product.is_active.is_(True))
+        .order_by(Product.sort_order, Product.id)
+        .limit(3)
+        .all()
+    )
+    return [product.id for product in products]
 
 #====> main entry point for the bot's message handling
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -32,10 +64,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     #====> get the AI's reply, and handle any lead or handoff
     db = SessionLocal()
     try:
-        reply, lead, handoff_reason, conversation = await get_ai_reply(
+        reply, lead, handoff_reason, conversation, commerce = await get_ai_reply(
             db, business_id, chat_id, customer_message
         )
         await update.message.reply_text(reply)
+
+        product_ids = _product_ids_for_photo_reply(db, business_id, customer_message, commerce)
+        if product_ids:
+            products = (
+                db.query(Product)
+                .filter(
+                    Product.business_id == business_id,
+                    Product.id.in_(product_ids),
+                    Product.is_active.is_(True),
+                )
+                .all()
+            )
+            for product in products:
+                photo_urls = (product.photo_urls or [])[:2]
+                if not photo_urls:
+                    await update.message.reply_text(
+                        f"No photo is saved yet for {product.name_en}, but I can describe it or help you choose a variant."
+                    )
+                for photo_url in photo_urls:
+                    try:
+                        await update.message.reply_photo(photo=photo_url)
+                    except Exception:
+                        logger.warning("Could not send product photo url=%s", photo_url, exc_info=True)
 
         if lead:
             await leads.process_lead(
@@ -49,16 +104,63 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 interest=lead.get("interest", ""),
             )
 
+        db.commit()
+
+        if commerce and (commerce.get("cart_patch") or commerce.get("order")):
+            cart_patch = commerce.get("cart_patch") or commerce.get("order")
+            try:
+                cart = merge_cart_patch(db, business_id, conversation.id, cart_patch)
+                if commerce.get("confirmed_order") and cart_ready_for_order(cart):
+                    order = create_order_from_cart(db, business_id, conversation.id, cart)
+                    await notify_order(db, business_id, context.bot, owner_chat_id, order)
+                db.commit()
+            except (BusinessRuleError, HTTPException) as exc:
+                detail = getattr(exc, "detail", str(exc))
+                logger.warning(
+                    "Could not create retail order business_id=%s conversation_id=%s detail=%s",
+                    business_id,
+                    conversation.id,
+                    detail,
+                    exc_info=True,
+                )
+                db.rollback()
+                await update.message.reply_text(
+                    str(detail)
+                    or "I could not complete the order yet. Please confirm the item, delivery, and payment details."
+                )
+            except Exception:
+                logger.exception(
+                    "Retail cart/order side effect failed business_id=%s conversation_id=%s",
+                    business_id,
+                    conversation.id,
+                )
+                db.rollback()
+                await update.message.reply_text(
+                    "I saved your message, but I could not complete the order yet. Please confirm the item, delivery address, and payment method again."
+                )
+
         #====> if the AI decided to hand off to a human, notify the owner/admins
-        if handoff_reason:
-            await handoff.notify_owner(
-                db, business_id, context.bot, owner_chat_id, conversation, handoff_reason
+        try:
+            if handoff_reason:
+                await handoff.notify_owner(
+                    db, business_id, context.bot, owner_chat_id, conversation, handoff_reason
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "Handoff notification failed business_id=%s conversation_id=%s",
+                business_id,
+                conversation.id,
             )
 
-        db.commit()
     except Exception:
         db.rollback()
-        raise
+        logger.exception(
+            "Telegram message side effect failed business_id=%s chat_id=%s after reply handling",
+            business_id,
+            chat_id,
+        )
     finally:
         db.close()
 

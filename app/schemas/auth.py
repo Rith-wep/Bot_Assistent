@@ -14,4 +14,5 @@ class AuthProfileResponse(BaseModel):
     role: str
     business_id: int
     business_name: str
+    business_type: BusinessType
     logo_url: str | None = None

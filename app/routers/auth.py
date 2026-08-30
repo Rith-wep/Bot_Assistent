@@ -24,6 +24,7 @@ def _profile(db: Session, user) -> AuthProfileResponse:
         role=user.role.value,
         business_id=business.id,
         business_name=business.name,
+        business_type=business.business_type,
         logo_url=business.logo_url,
     )
 

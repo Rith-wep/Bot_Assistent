@@ -13,7 +13,7 @@ const fieldClass =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-ink transition-colors duration-150 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "mb-1 block text-sm font-medium text-ink";
 
-export default function AiBehaviorSection({ aiBehavior, onSaved, showToast }) {
+export default function AiBehaviorSection({ aiBehavior, onSaved, showToast, embedded = false }) {
   const [form, setForm] = useState({
     assistant_display_name: aiBehavior.assistant_display_name || "",
     welcome_message_en: aiBehavior.welcome_message_en || "",
@@ -48,8 +48,12 @@ export default function AiBehaviorSection({ aiBehavior, onSaved, showToast }) {
     }
   }
 
-  return (
-    <SectionCard title="AI assistant behavior">
+  const content = (
+    <>
+      <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-4">
+        <h3 className="font-heading text-sm font-bold text-gray-900">Greeting and handoff behavior</h3>
+        <p className="mt-1 text-xs text-gray-500">Customer-facing welcome copy and escalation rules.</p>
+      </div>
       <div>
         <label className={labelClass}>Assistant display name</label>
         <input
@@ -106,6 +110,12 @@ export default function AiBehaviorSection({ aiBehavior, onSaved, showToast }) {
       <Button onClick={handleSave} disabled={saving}>
         {saving ? "Saving..." : "Save"}
       </Button>
+    </>
+  );
+
+  return embedded ? content : (
+    <SectionCard title="AI assistant behavior">
+      {content}
     </SectionCard>
   );
 }

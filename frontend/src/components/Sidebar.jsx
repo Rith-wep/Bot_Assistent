@@ -1,9 +1,9 @@
-import { LogOut } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { prefetchApi } from "../api/client";
 import { APP_NAVIGATION } from "../config/navigation";
 import { useAuth } from "../context/AuthContext";
-import Logo from "./Logo";
 
 const PREFETCH_PATHS = {
   "/app/dashboard": ["/dashboard/summary"],
@@ -21,10 +21,17 @@ function prefetchRoute(to) {
 
 function NavItems({ orientation }) {
   const isRow = orientation === "row";
+  const { businessType } = useAuth();
   return (
     <>
-      {APP_NAVIGATION.map(({ to, label, icon: Icon }) =>
-        (
+      {APP_NAVIGATION.map(({ to, label, icon: Icon }) => {
+        const displayLabel =
+          businessType === "product_retail" && to === "/app/knowledge"
+            ? "Products"
+            : businessType === "product_retail" && to === "/app/leads"
+              ? "Orders"
+              : label;
+        return (
           <NavLink
             key={to}
             to={to}
@@ -35,66 +42,64 @@ function NavItems({ orientation }) {
                 isRow ? "flex-col gap-1 px-3 py-1.5 text-[11px]" : "px-3 py-2 text-sm"
               } ${
                 isActive
-                  ? "bg-accent/15 text-accent"
-                  : "text-shell-text-muted hover:bg-white/5 hover:text-shell-text"
+                  ? "bg-accent-soft text-accent-dark shadow-sm"
+                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
               }`
             }
           >
             <Icon className={isRow ? "h-5 w-5" : "h-[18px] w-[18px]"} strokeWidth={2} />
-            {label}
+            {displayLabel}
           </NavLink>
-        )
-      )}
+        );
+      })}
     </>
   );
 }
 
 export default function Sidebar() {
-  const { businessName, businessLogo, logout } = useAuth();
+  const { businessName, businessLogo } = useAuth();
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showUploadedLogo = businessLogo && !logoFailed;
+  const fallbackLetter = (businessName || "WeCare").trim().charAt(0).toUpperCase();
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [businessLogo]);
 
   return (
     <>
       {/* Desktop rail */}
-      <aside className="hidden w-60 shrink-0 flex-col bg-base sm:flex">
-        <div className="mx-3 mt-2 flex min-h-16 items-center gap-2 rounded-xl border border-gray-400 bg-gray-300 px-2.5 py-2 shadow-md">
-          {businessLogo ? (
-            <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white p-1.5">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-gray-200 bg-white sm:flex">
+        <button type="button" className="mx-3 mt-3 flex min-h-14 items-center gap-3 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-left shadow-sm transition-colors duration-150 hover:bg-gray-50">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+            {showUploadedLogo ? (
               <img
                 src={businessLogo}
                 alt={`${businessName || "Business"} logo`}
-                className="max-h-full max-w-full object-contain"
+                className="h-full w-full object-cover"
+                onError={() => setLogoFailed(true)}
               />
-            </div>
-          ) : (
-            <Logo className="h-12 w-16 shrink-0" />
-          )}
-          {businessName ? (
-            <span className="truncate font-sans text-base font-bold text-slate-700">
-              {businessName}
-            </span>
-          ) : (
-            <span className="font-sans text-xl font-bold tracking-tight">
-              <span className="text-accent">We</span>
-              <span className="text-slate-500">Care</span>
-            </span>
-          )}
-        </div>
-        <nav className="flex-1 space-y-1 px-3 py-2">
+            ) : (
+              <span className="flex h-full w-full items-center justify-center bg-accent-soft font-heading text-base font-bold text-accent-dark">
+                {fallbackLetter}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-heading text-sm font-bold text-gray-900">
+              {businessName || "WeCare"}
+            </p>
+            <p className="text-xs font-medium text-gray-500">Workspace</p>
+          </div>
+          <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" strokeWidth={2} />
+        </button>
+        <nav className="flex-1 space-y-1 px-3 py-4">
           <NavItems orientation="col" />
         </nav>
-        <div className="border-t border-shell-border p-3">
-          <button
-            onClick={logout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-shell-text-muted transition-colors duration-150 hover:bg-white/5 hover:text-shell-text"
-          >
-            <LogOut className="h-[18px] w-[18px]" strokeWidth={2} />
-            Sign out
-          </button>
-        </div>
       </aside>
 
       {/* Mobile bottom bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-50 flex items-stretch justify-around border-t border-shell-border bg-base pb-[env(safe-area-inset-bottom)] sm:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-50 flex items-stretch justify-around border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] sm:hidden">
         <NavItems orientation="row" />
       </nav>
     </>

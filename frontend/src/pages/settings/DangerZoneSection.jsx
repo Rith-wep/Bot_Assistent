@@ -1,7 +1,7 @@
+import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch, ApiError } from "../../api/client";
-import Button from "../../components/Button";
 import ConfirmTypeDialog from "../../components/ConfirmTypeDialog";
 import SectionCard from "../../components/SectionCard";
 import { useAuth } from "../../context/AuthContext";
@@ -38,26 +38,32 @@ export default function DangerZoneSection({ businessName, showToast }) {
 
   return (
     <SectionCard title="Danger zone" danger>
-      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-ink">Delete all knowledge items</p>
-          <p className="text-xs text-ink-muted">Your assistant will have nothing to answer from.</p>
+      <div className="flex flex-col items-start gap-3 rounded-xl border border-red-200 bg-red-50/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" strokeWidth={2} />
+          <div>
+            <p className="text-sm font-semibold text-red-900">Delete all knowledge items</p>
+            <p className="text-xs text-red-700/80">Your assistant will have nothing to answer from.</p>
+          </div>
         </div>
-        <Button variant="destructive" onClick={() => setShowDeleteKnowledge(true)}>
+        <button type="button" onClick={() => setShowDeleteKnowledge(true)} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-500 px-4 py-2 text-sm font-semibold text-red-600 transition-colors duration-150 hover:bg-red-50">
           Delete knowledge
-        </Button>
+        </button>
       </div>
 
-      <div className="flex flex-col items-start gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-ink">Delete account</p>
-          <p className="text-xs text-ink-muted">
-            Permanently deletes your business, bot, knowledge, leads, and conversations.
-          </p>
+      <div className="flex flex-col items-start gap-3 rounded-xl border border-red-200 bg-red-50/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" strokeWidth={2} />
+          <div>
+            <p className="text-sm font-semibold text-red-900">Delete account</p>
+            <p className="text-xs text-red-700/80">
+              Permanently deletes your business, bot, knowledge, leads, and conversations.
+            </p>
+          </div>
         </div>
-        <Button variant="destructive" onClick={() => setShowDeleteAccount(true)}>
+        <button type="button" onClick={() => setShowDeleteAccount(true)} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-500 px-4 py-2 text-sm font-semibold text-red-600 transition-colors duration-150 hover:bg-red-50">
           Delete account
-        </Button>
+        </button>
       </div>
 
       <ConfirmTypeDialog

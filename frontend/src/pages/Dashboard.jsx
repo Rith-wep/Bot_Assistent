@@ -11,13 +11,14 @@ import StartConversationCard from "../components/StartConversationCard";
 import StatCard from "../components/StatCard";
 import { ToastContainer, useToasts } from "../components/Toast";
 import { formatRelativeTime } from "../utils/format";
+import { useAuth } from "../context/AuthContext";
 
 const ConversationsChart = lazy(() => import("../components/ConversationsChart"));
 
 function DashboardSkeleton() {
   return (
     <div>
-      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="mb-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
         <Skeleton className="mb-5 h-5 w-56" />
         <Skeleton className="mb-6 h-1.5 w-full" />
         {[0, 1, 2, 3].map((i) => (
@@ -29,14 +30,14 @@ function DashboardSkeleton() {
       </div>
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <div key={i} className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
             <Skeleton className="mb-3 h-4 w-24" />
             <Skeleton className="h-7 w-16" />
           </div>
         ))}
       </div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {[0, 1].map((i) => <div key={i} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"><Skeleton className="mb-5 h-5 w-48" /><Skeleton className="h-32 w-full" /></div>)}
+        {[0, 1].map((i) => <div key={i} className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm"><Skeleton className="mb-5 h-5 w-48" /><Skeleton className="h-32 w-full" /></div>)}
       </div>
     </div>
   );
@@ -55,6 +56,8 @@ export default function Dashboard() {
   const loading = summaryLoading;
   const error = (summaryError || activityError) instanceof ApiError ? (summaryError || activityError).message : (summaryError || activityError);
   const { toasts, addToast } = useToasts();
+  const { businessType } = useAuth();
+  const isRetail = businessType === "product_retail";
 
   useEffect(() => {
     const schedule = window.requestIdleCallback || ((callback) => window.setTimeout(callback, 0));
@@ -97,7 +100,7 @@ export default function Dashboard() {
               />
               <StatCard
                 icon={UserPlus}
-                label="New leads"
+                label={isRetail ? "New orders" : "New leads"}
                 value={stats.new_leads.value}
                 changePct={stats.new_leads.change_pct}
                 muted={!stats.has_activity}
@@ -137,18 +140,18 @@ export default function Dashboard() {
 
                 <Suspense
                   fallback={
-                    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
                       <Skeleton className="h-60 w-full" />
                     </div>
                   }
                 >
-                  {activity ? <ConversationsChart data={stats.chart} range={range} onRangeChange={setRange} /> : <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"><Skeleton className="h-60 w-full" /></div>}
+                  {activity ? <ConversationsChart data={stats.chart} range={range} onRangeChange={setRange} /> : <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm"><Skeleton className="h-60 w-full" /></div>}
                 </Suspense>
 
                 <div className="mt-6 lg:mt-4 grid grid-cols-1 gap-6 lg:gap-4 lg:grid-cols-2">
-                  <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm lg:p-4">
+                  <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow duration-150 hover:shadow-md lg:p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <h2 className="font-heading font-bold text-ink">Recent leads</h2>
+                      <h2 className="font-heading font-bold text-ink">{isRetail ? "Recent orders" : "Recent leads"}</h2>
                       <Link
                         to="/app/leads"
                         className="text-sm font-medium text-accent-dark hover:underline"
@@ -157,7 +160,7 @@ export default function Dashboard() {
                       </Link>
                     </div>
                     {stats.recent_leads.length === 0 ? (
-                      <p className="text-sm text-ink-muted">No leads yet.</p>
+                      <p className="text-sm text-ink-muted">{isRetail ? "No orders yet." : "No leads yet."}</p>
                     ) : (
                       <div className="space-y-3">
                         {stats.recent_leads.map((lead) => (
@@ -177,7 +180,7 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm lg:p-4">
+                  <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow duration-150 hover:shadow-md lg:p-4">
                     <div className="mb-3 flex items-center justify-between">
                       <h2 className="font-heading font-bold text-ink">Recent conversations</h2>
                       <Link

@@ -22,7 +22,7 @@ function formatTick(dateStr) {
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-md">
+    <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-md">
       <p className="text-xs text-ink-muted">{formatTick(label)}</p>
       <p className="text-sm font-semibold text-ink">{payload[0].value} conversations</p>
     </div>
@@ -31,7 +31,7 @@ function CustomTooltip({ active, payload, label }) {
 
 export default function ConversationsChart({ data, range, onRangeChange }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow duration-150 hover:shadow-md">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="font-heading font-bold text-ink">Conversations</h2>
         <div className="flex gap-1 rounded-lg bg-gray-100 p-1">

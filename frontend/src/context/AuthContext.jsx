@@ -150,6 +150,7 @@ export function AuthProvider({ children }) {
         loading,
         isAuthenticated: Boolean(session && profile),
         businessName: profile?.business_name || "",
+        businessType: profile?.business_type || "",
         businessLogo: profile?.logo_url || "",
         completeAuthentication,
         updateProfile,

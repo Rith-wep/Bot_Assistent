@@ -8,10 +8,12 @@ import PageHeader from "../components/PageHeader";
 import Pagination from "../components/Pagination";
 import { RowListSkeleton } from "../components/Skeleton";
 import { formatDate } from "../utils/format";
+import { useAuth } from "../context/AuthContext";
+import Orders from "./Orders";
 
 const PAGE_SIZE = 20;
 
-export default function Leads() {
+function LeadManager() {
   const [page, setPage] = useState(1);
   const path = `/leads?page=${page}&page_size=${PAGE_SIZE}`;
   const {
@@ -135,4 +137,9 @@ export default function Leads() {
       )}
     </div>
   );
+}
+
+export default function Leads() {
+  const { businessType } = useAuth();
+  return businessType === "product_retail" ? <Orders /> : <LeadManager />;
 }

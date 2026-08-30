@@ -21,6 +21,16 @@ _INVALID_TOKEN = HTTPException(
 )
 
 
+def _invalid_token(exc: Exception | None = None) -> HTTPException:
+    if settings.app_env == "development" and exc is not None:
+        return HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid or expired token ({exc.__class__.__name__})",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return _INVALID_TOKEN
+
+
 class CurrentUser:
     def __init__(self, user_id: int, business_id: int):
         self.user_id = user_id
@@ -44,7 +54,7 @@ def get_supabase_identity(token: str = Depends(oauth2_scheme)) -> SupabaseIdenti
             raise ValueError("missing email")
     except Exception as exc:
         logger.warning("Supabase access token rejected: %s", exc.__class__.__name__)
-        raise _INVALID_TOKEN
+        raise _invalid_token(exc)
 
     return SupabaseIdentity(
         user_id=supabase_user_id,
@@ -62,7 +72,7 @@ def get_current_user(
     user = get_user_by_supabase_id(db, identity.user_id)
     if user is None:
         logger.warning("Supabase identity has no local user: %s", identity.user_id)
-        raise _INVALID_TOKEN
+        raise _invalid_token(ValueError("local user not found"))
 
     return CurrentUser(user_id=user.id, business_id=user.business_id)
 
