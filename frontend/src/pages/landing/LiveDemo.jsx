@@ -1,4 +1,4 @@
-import { Bot, Send, Sparkles } from "lucide-react";
+import { Bot, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch, ApiError } from "../../api/client";
 
@@ -58,7 +58,6 @@ export default function LiveDemo() {
       <div className="relative mx-auto max-w-3xl px-4 sm:px-8">
         <div className="mb-10 text-center">
           <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm">
-            {/* <Sparkles className="h-3.5 w-3.5" strokeWidth={2} /> */}
             Live demo — real replies, no signup
           </div>
           <h2 className="text-balance font-heading text-3xl font-extrabold tracking-[-0.04em] text-landing-ink sm:text-5xl">

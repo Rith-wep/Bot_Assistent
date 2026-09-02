@@ -1,4 +1,4 @@
-import { CreditCard, MessageSquare, Sparkles, UserPlus } from "lucide-react";
+import { Bot, CreditCard, MessageSquare, UserPlus } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiError } from "../api/client";
@@ -106,7 +106,7 @@ export default function Dashboard() {
                 muted={!stats.has_activity}
               />
               <StatCard
-                icon={Sparkles}
+                icon={Bot}
                 label="Handled by AI"
                 value={stats.messages_ai_handled.value}
                 changePct={stats.messages_ai_handled.change_pct}

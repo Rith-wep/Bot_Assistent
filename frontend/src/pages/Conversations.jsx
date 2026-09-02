@@ -2,12 +2,12 @@ import {
   CheckCircle2,
   ChevronRight,
   Circle,
+  Bot,
   MessageSquare,
   Phone,
   Search,
   Send,
   ShoppingBag,
-  Sparkles,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -519,7 +519,7 @@ export default function Conversations() {
                 )}
                 <div className="flex items-end gap-3 rounded-2xl border border-gray-200 bg-slate-50 p-2">
                   <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent-soft/60 text-accent-dark sm:flex">
-                    <Sparkles className="h-4 w-4" />
+                    <Bot className="h-4 w-4" />
                   </div>
                   <textarea
                     value={reply}

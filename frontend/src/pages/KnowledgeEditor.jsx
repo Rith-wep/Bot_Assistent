@@ -1,4 +1,4 @@
-import { BookOpen, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { BookOpen, Pencil, Plus, Trash2, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { apiFetch, ApiError } from "../api/client";
 import { useCachedApi } from "../api/useCachedApi";
@@ -77,7 +77,7 @@ function KnowledgeManager() {
                 Add item
               </Button>
               <Button onClick={() => setAddMode("ai")}>
-                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+                <Wand2 className="h-4 w-4" strokeWidth={2.5} />
                 Add with AI
               </Button>
             </div>
@@ -116,7 +116,7 @@ function KnowledgeManager() {
           action={
             <div className="flex flex-col items-center gap-2">
               <Button onClick={() => setAddMode("ai")}>
-                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+                <Wand2 className="h-4 w-4" strokeWidth={2.5} />
                 Add with AI
               </Button>
               <button

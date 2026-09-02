@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 _CONTEXT_EXCHANGES = 3  # last ~3 exchanges (6 messages), included so the owner has context
 
 
+# ---------------------------------------------------------------------------
+# Handoff notification workflow
+# ---------------------------------------------------------------------------
+
+
 async def notify_owner(
     db: Session,
     business_id: int,

@@ -11,6 +11,11 @@ from app.repositories.admin import AdminRepository
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Telegram owner/admin fan-out
+# ---------------------------------------------------------------------------
+
+
 async def notify_recipients(
     db: Session,
     business_id: int,

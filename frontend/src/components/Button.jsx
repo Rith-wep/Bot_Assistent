@@ -1,3 +1,5 @@
+import { Loader2 } from "lucide-react";
+
 const VARIANTS = {
   primary:
     "bg-accent-dark text-white hover:bg-accent-soft-text focus-visible:ring-accent shadow-sm",
@@ -14,16 +16,19 @@ export default function Button({
   variant = "primary",
   className = "",
   disabled,
+  isLoading = false,
+  loadingLabel,
   children,
   ...props
 }) {
   return (
     <button
-      disabled={disabled}
+      disabled={disabled || isLoading}
       className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${className}`}
       {...props}
     >
-      {children}
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.5} />}
+      {isLoading ? loadingLabel : children}
     </button>
   );
 }

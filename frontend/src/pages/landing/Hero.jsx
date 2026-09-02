@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCheck, MessageCircle, Send, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCheck, MessageCircle, Send } from "lucide-react";
 import { Link } from "react-router-dom";
 
 function scrollToDemo(e) {
@@ -16,7 +16,6 @@ export default function Hero() {
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-12 sm:px-8 sm:pt-24 lg:grid-cols-[1.05fr_.95fr] lg:py-28">
         <div>
           <div className="mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 shadow-sm sm:px-4">
-            {/* <Sparkles className="h-3.5 w-3.5" /> */}
             <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] sm:text-xs sm:tracking-[0.14em]">Built for Cambodian businesses</span>
           </div>
           <h1 className="max-w-3xl text-balance font-heading text-4xl font-extrabold leading-[1.02] tracking-[-0.05em] text-landing-ink min-[390px]:text-5xl sm:text-7xl">

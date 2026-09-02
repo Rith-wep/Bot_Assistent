@@ -44,11 +44,18 @@ _prompt_context_cache: dict[int, tuple[float, str, bool]] = {}
 _PROMPT_CONTEXT_TTL_SECONDS = 60
 
 
+# ---------------------------------------------------------------------------
+# Prompt context cache
+# ---------------------------------------------------------------------------
+
+
 def clear_prompt_context_cache(business_id: int) -> None:
+    """Clear cached business context after owner-facing knowledge changes."""
     _prompt_context_cache.pop(business_id, None)
 
 
 def _get_cached_business_info(db: Session, business_id: int) -> str:
+    """Return short-lived business facts used in the system prompt."""
     now = time.monotonic()
     cached = _prompt_context_cache.get(business_id)
     if cached and now - cached[0] < _PROMPT_CONTEXT_TTL_SECONDS:
@@ -151,7 +158,12 @@ _CLUSTER_INSTRUCTION = (
     "existing cluster's label_en/label_km unchanged."
 )
 
-## ========== cluster unanswered questions ==========
+
+# ---------------------------------------------------------------------------
+# Unanswered question clustering
+# ---------------------------------------------------------------------------
+
+
 async def cluster_questions(
     existing_clusters: list[dict], new_questions: list[dict]
 ) -> Optional[list[dict]]:
@@ -165,7 +177,6 @@ async def cluster_questions(
     caller should treat that business as unclustered this run and retry next time.
     """
 
-    ## Build the prompt for Groq
     prompt = json.dumps(
         {"existing_clusters": existing_clusters, "new_questions": new_questions},
         ensure_ascii=False,
@@ -233,12 +244,18 @@ _PRODUCT_EXTRACT_INSTRUCTION = (
     "stock. If stock is missing, use 0. Use numeric prices only."
 )
 
-## ========= extract knowledge items from raw text ==========
+
+# ---------------------------------------------------------------------------
+# AI quick-add extraction
+# ---------------------------------------------------------------------------
+
+
 def _template_extraction_hint(business_type: str) -> str:
+    """Return industry-specific guidance appended to the knowledge extractor."""
     from app.services.knowledge_templates import get_templates
     return f"\n\nIndustry-specific extraction guidance: {get_templates(business_type)['extractor_hint']}."
 
-## ======== extract knowledge items from raw text ==========
+
 async def extract_knowledge_items(text: str, business_type: str = "professional_other") -> Optional[list[dict]]:
     """Quick-add with AI: turn pasted raw text into draft knowledge items for
     the owner to review — nothing is persisted here, this only returns drafts.
@@ -314,7 +331,11 @@ async def extract_products(text: str) -> Optional[list[dict]]:
     return cleaned
 
 
-## ======== system prompt assembly for a business's AI assistant ==========
+# ---------------------------------------------------------------------------
+# System prompt assembly
+# ---------------------------------------------------------------------------
+
+
 def _build_system_instruction(business: Business, db: Session, handoff_active: bool) -> str:
     """Build and log the exact per-business system prompt sent to the model."""
     business_info = _get_cached_business_info(db, business.id)
@@ -371,14 +392,19 @@ def _build_system_instruction(business: Business, db: Session, handoff_active: b
     return instruction
 
 
-## ======== conversation history -> Groq message format ==========
+# ---------------------------------------------------------------------------
+# Provider message conversion and generation
+# ---------------------------------------------------------------------------
+
+
 def _to_contents(messages) -> list[dict[str, str]]:
+    """Convert persisted messages into the role/content shape expected by Groq."""
     return [
         {"role": _GROQ_ROLE[m.direction.value], "content": m.text}
         for m in messages
     ]
 
-## ======== generate reply the customer sees, then classify for lead/handoff ==========
+
 async def _generate_reply(contents: list[dict[str, str]], system_instruction: str) -> str:
     """Generate the customer-facing reply. Retries once after a short delay on failure."""
     messages = [{"role": "system", "content": system_instruction}, *contents]
@@ -396,7 +422,11 @@ async def _generate_reply(contents: list[dict[str, str]], system_instruction: st
     return _FAKE_IMAGE_MARKDOWN_RE.sub("", reply).strip() or FALLBACK_REPLY
 
 
-## ======== classify for lead/handoff ==========
+# ---------------------------------------------------------------------------
+# Silent classifiers
+# ---------------------------------------------------------------------------
+
+
 async def _classify(contents: list[dict[str, str]], assistant_reply: str) -> Optional[dict]:
     """Silently classify the exchange for lead/handoff signals (never shown to the customer)."""
     classifier_contents = contents + [
@@ -438,6 +468,7 @@ _RETAIL_CLASSIFIER_INSTRUCTION = (
 
 
 async def _classify_retail(contents: list[dict[str, str]], assistant_reply: str) -> Optional[dict]:
+    """Classify product-retail chat state for photos, cart updates, and orders."""
     classifier_contents = contents + [{"role": "assistant", "content": assistant_reply}]
     try:
         response = await _client.chat.completions.create(
@@ -454,7 +485,11 @@ async def _classify_retail(contents: list[dict[str, str]], assistant_reply: str)
         return None
 
 
-## ======== apply conversation flags based on classification ==========
+# ---------------------------------------------------------------------------
+# Conversation state updates
+# ---------------------------------------------------------------------------
+
+
 def _apply_conversation_flags(
     business_id: int,
     chat_id: int,
@@ -486,7 +521,12 @@ def _apply_conversation_flags(
     conversation_state.reset_unanswered_streak(business_id, chat_id)
     return None
 
-## ======== get AI reply for a customer message ==========
+
+# ---------------------------------------------------------------------------
+# Public AI service entry points
+# ---------------------------------------------------------------------------
+
+
 async def get_ai_reply(
     db: Session, business_id: int, chat_id: int, user_message: str
 ) -> tuple[str, Optional[dict], Optional[str], Conversation, Optional[dict]]:
@@ -533,7 +573,6 @@ async def get_ai_reply(
     return reply, lead, handoff_reason, conversation, commerce
 
 
-## ======== preview reply for onboarding test-chat ==========
 async def generate_preview_reply(
     db: Session, business_id: int, history: list[dict], user_message: str
 ) -> str:

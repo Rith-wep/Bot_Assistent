@@ -1,3 +1,9 @@
+"""FastAPI dependency helpers for authentication and tenant scoping.
+
+Routes use these dependencies to convert a Supabase bearer token into the
+local user and business context that every tenant-scoped query relies on.
+"""
+
 import uuid
 import logging
 
@@ -21,7 +27,13 @@ _INVALID_TOKEN = HTTPException(
 )
 
 
+# ---------------------------------------------------------------------------
+# Authentication error helpers
+# ---------------------------------------------------------------------------
+
+
 def _invalid_token(exc: Exception | None = None) -> HTTPException:
+    """Return a safe 401 response, with extra detail only in development."""
     if settings.app_env == "development" and exc is not None:
         return HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -31,20 +43,35 @@ def _invalid_token(exc: Exception | None = None) -> HTTPException:
     return _INVALID_TOKEN
 
 
+# ---------------------------------------------------------------------------
+# Request identity containers
+# ---------------------------------------------------------------------------
+
+
 class CurrentUser:
+    """Local authenticated user and tenant context used by application routes."""
+
     def __init__(self, user_id: int, business_id: int):
         self.user_id = user_id
         self.business_id = business_id
 
 
 class SupabaseIdentity:
+    """Validated identity details decoded from the Supabase access token."""
+
     def __init__(self, user_id: uuid.UUID, email: str, metadata: dict):
         self.user_id = user_id
         self.email = email
         self.metadata = metadata
 
 
+# ---------------------------------------------------------------------------
+# Public FastAPI dependencies
+# ---------------------------------------------------------------------------
+
+
 def get_supabase_identity(token: str = Depends(oauth2_scheme)) -> SupabaseIdentity:
+    """Validate the bearer token and return the Supabase identity payload."""
     try:
         payload = decode_supabase_access_token(token)
         supabase_user_id = uuid.UUID(payload["sub"])
@@ -67,8 +94,9 @@ def get_current_user(
     identity: SupabaseIdentity = Depends(get_supabase_identity),
     db: Session = Depends(get_db),
 ) -> CurrentUser:
-    # Re-checked against the DB every request (not just trusted from the token)
-    # so a deleted user or business reassignment can't still act as this user.
+    """Resolve the local user on every request before exposing tenant context."""
+    # Re-check the DB every request so deleted users or reassigned businesses
+    # cannot keep acting through an otherwise valid Supabase token.
     user = get_user_by_supabase_id(db, identity.user_id)
     if user is None:
         logger.warning("Supabase identity has no local user: %s", identity.user_id)

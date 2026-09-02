@@ -1,9 +1,9 @@
-import { Check, ExternalLink, PartyPopper, Send } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, Check, ExternalLink, PartyPopper, Send } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, ApiError } from "../../api/client";
 import Button from "../../components/Button";
 
-function ChecklistRow({ done, children }) {
+const ChecklistRow = memo(function ChecklistRow({ done, children }) {
   return (
     <div className="flex items-center gap-3 py-2">
       <div
@@ -16,9 +16,9 @@ function ChecklistRow({ done, children }) {
       <span className={`text-sm ${done ? "text-ink" : "text-ink-muted"}`}>{children}</span>
     </div>
   );
-}
+});
 
-export default function Step4GoLive() {
+export default function Step4GoLive({ onBack }) {
   const [checklist, setChecklist] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,7 +32,7 @@ export default function Step4GoLive() {
   const [goLiveError, setGoLiveError] = useState("");
   const [liveResult, setLiveResult] = useState(null);
 
-  async function loadChecklist() {
+  const loadChecklist = useCallback(async () => {
     try {
       const data = await apiFetch("/onboarding/checklist");
       setChecklist(data);
@@ -41,17 +41,22 @@ export default function Step4GoLive() {
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    loadChecklist();
   }, []);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    loadChecklist();
+  }, [loadChecklist]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: history.length > 1 ? "smooth" : "auto" });
   }, [history]);
 
-  async function handleSend(e) {
+  const allReady = useMemo(
+    () => Boolean(checklist?.knowledge_ready && checklist?.bot_connected && checklist?.owner_linked),
+    [checklist?.bot_connected, checklist?.knowledge_ready, checklist?.owner_linked]
+  );
+
+  const handleSend = useCallback(async (e) => {
     e.preventDefault();
     const message = draft.trim();
     if (!message) return;
@@ -73,9 +78,9 @@ export default function Step4GoLive() {
     } finally {
       setSending(false);
     }
-  }
+  }, [draft, history]);
 
-  async function handleGoLive() {
+  const handleGoLive = useCallback(async () => {
     setGoLiveError("");
     setGoingLive(true);
     try {
@@ -86,7 +91,7 @@ export default function Step4GoLive() {
     } finally {
       setGoingLive(false);
     }
-  }
+  }, []);
 
   if (loading) return <p className="text-sm text-ink-muted">Loading...</p>;
   if (error) return <p className="rounded-lg bg-error-soft px-3 py-2 text-sm text-error">{error}</p>;
@@ -125,21 +130,24 @@ export default function Step4GoLive() {
     );
   }
 
-  const allReady = checklist.knowledge_ready && checklist.bot_connected && checklist.owner_linked;
-
   return (
     <div>
       <h1 className="font-heading text-2xl font-bold tracking-tight text-ink sm:text-3xl">Test and go live</h1>
-      <p className="mt-2 text-sm leading-6 text-ink-muted">
-        Try asking your assistant a real question, then go live when you're happy.
-      </p>
+      
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex items-center justify-between gap-3"><h2 className="font-heading font-bold text-ink">Before you go live</h2><span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-accent-dark">Checklist</span></div>
-          <ChecklistRow done={checklist.knowledge_ready}>Knowledge added</ChecklistRow>
-          <ChecklistRow done={checklist.bot_connected}>Bot connected</ChecklistRow>
-          <ChecklistRow done={checklist.owner_linked}>Owner linked</ChecklistRow>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-heading font-bold text-ink">Before you go live</h2>
+            <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-accent-dark">
+              Checklist
+            </span>
+          </div>
+          <div className="mt-4 space-y-2">
+            <ChecklistRow done={checklist.knowledge_ready}>Knowledge added</ChecklistRow>
+            <ChecklistRow done={checklist.bot_connected}>Bot connected</ChecklistRow>
+            <ChecklistRow done={checklist.owner_linked}>Owner linked</ChecklistRow>
+          </div>
 
           {goLiveError && (
             <p className="mt-3 rounded-lg bg-error-soft px-3 py-2 text-sm text-error">
@@ -149,16 +157,18 @@ export default function Step4GoLive() {
 
           <Button
             onClick={handleGoLive}
-            disabled={!allReady || goingLive}
-            className="mt-4 w-full"
+            disabled={!allReady}
+            isLoading={goingLive}
+            loadingLabel="Going live..."
+            className="mt-7 w-full"
           >
-            {goingLive ? "Going live..." : "Go live"}
+            Go live
           </Button>
         </div>
 
         <div className="flex flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="mb-3 font-heading font-bold text-ink">Try it out</h2>
-          <div className="flex-1 space-y-2 overflow-y-auto" style={{ maxHeight: 320 }}>
+          <div className="flex-1 space-y-3 overflow-y-auto py-2" style={{ maxHeight: 320 }}>
             {history.length === 0 && (
               <p className="text-sm text-ink-muted">
                 Ask something a customer might ask — e.g. a price or your hours.
@@ -177,7 +187,7 @@ export default function Step4GoLive() {
             ))}
             <div ref={chatEndRef} />
           </div>
-          <form onSubmit={handleSend} className="mt-3 flex gap-2">
+          <form onSubmit={handleSend} className="mt-7 flex gap-2">
             <input
               type="text"
               value={draft}
@@ -185,11 +195,28 @@ export default function Step4GoLive() {
               placeholder="Type a question..."
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <Button type="submit" disabled={sending || !draft.trim()} className="shrink-0">
+            <Button
+              type="submit"
+              disabled={!draft.trim()}
+              isLoading={sending}
+              className="shrink-0"
+              aria-label="Send preview message"
+            >
               <Send className="h-4 w-4" strokeWidth={2.5} />
             </Button>
           </form>
         </div>
+      </div>
+
+      <div className="sticky bottom-4 z-20 mt-6 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/60 backdrop-blur">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-ink"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
       </div>
     </div>
   );

@@ -4,9 +4,9 @@ import {
   ImagePlus,
   Pencil,
   Plus,
-  Sparkles,
   Trash2,
   Upload,
+  Wand2,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -611,7 +611,7 @@ function AiProductAdd({ onSaved, onCancel }) {
           Cancel
         </Button>
         <Button type="button" onClick={extract} disabled={busy || !text.trim()}>
-          <Sparkles className="h-4 w-4" />
+          <Wand2 className="h-4 w-4" />
           Extract
         </Button>
       </div>
@@ -752,7 +752,7 @@ export default function Products() {
               Add product
             </Button>
             <Button onClick={() => setShowAi((current) => !current)}>
-              <Sparkles className="h-4 w-4" />
+              <Wand2 className="h-4 w-4" />
               Add with AI
             </Button>
           </div>

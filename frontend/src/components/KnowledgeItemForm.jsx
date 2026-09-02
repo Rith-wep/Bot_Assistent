@@ -123,10 +123,10 @@ export default function KnowledgeItemForm({ initial, onSubmit, onCancel, submitL
       </div>
 
       <div className="flex items-center gap-2 pt-1">
-        <Button type="submit" disabled={saving}>
-          {saving ? "Saving..." : submitLabel}
+        <Button type="submit" isLoading={saving} loadingLabel="Saving...">
+          {submitLabel}
         </Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
       </div>

@@ -19,6 +19,11 @@ from app.services.notifications import notify_recipients
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Lead persistence and owner/admin notification workflow
+# ---------------------------------------------------------------------------
+
+
 async def process_lead(
     db: Session,
     business_id: int,

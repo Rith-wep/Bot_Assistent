@@ -32,12 +32,19 @@ _DEFAULT_GREETING = "Hi! Send me a message and I'll do my best to help."
 _PHOTO_REQUEST_WORDS = ("photo", "picture", "image", "see", "show", "មើល", "រូប")
 
 
+# ---------------------------------------------------------------------------
+# Product photo helpers
+# ---------------------------------------------------------------------------
+
+
 def _looks_like_photo_request(text: str) -> bool:
+    """Detect simple customer phrasing that should trigger product photos."""
     lowered = text.lower()
     return any(word in lowered for word in _PHOTO_REQUEST_WORDS)
 
 
 def _product_ids_for_photo_reply(db, business_id: int, message: str, commerce: dict | None) -> list[int]:
+    """Choose which product photos to send after the AI describes products."""
     ids = list(dict.fromkeys((commerce or {}).get("mentioned_product_ids") or []))
     if ids:
         return ids[:3]
@@ -53,7 +60,11 @@ def _product_ids_for_photo_reply(db, business_id: int, message: str, commerce: d
     )
     return [product.id for product in products]
 
-#====> main entry point for the bot's message handling
+# ---------------------------------------------------------------------------
+# Customer message handler
+# ---------------------------------------------------------------------------
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Reply to the customer using the AI brain, with memory, lead capture, and handoff."""
     business_id = context.application.bot_data["business_id"]
@@ -61,7 +72,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     chat_id = update.effective_chat.id
     customer_message = update.message.text
 
-    #====> get the AI's reply, and handle any lead or handoff
     db = SessionLocal()
     try:
         reply, lead, handoff_reason, conversation, commerce = await get_ai_reply(
@@ -139,7 +149,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     "I saved your message, but I could not complete the order yet. Please confirm the item, delivery address, and payment method again."
                 )
 
-        #====> if the AI decided to hand off to a human, notify the owner/admins
         try:
             if handoff_reason:
                 await handoff.notify_owner(
@@ -165,7 +174,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         db.close()
 
 
-#====> /reset command: clear the conversation history and streak for this chat
+# ---------------------------------------------------------------------------
+# Maintenance commands
+# ---------------------------------------------------------------------------
+
+
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Clear this chat's conversation history and state (/reset command)."""
     business_id = context.application.bot_data["business_id"]
@@ -192,7 +205,11 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # await update.message.reply_text("ការសន្ទនាត្រូវបានលុបចោល។ ចាប់ផ្តើមថ្មីបានហើយ!")
 
-#====> /start command: claim ownership or welcome the user
+# ---------------------------------------------------------------------------
+# Owner/admin onboarding helpers
+# ---------------------------------------------------------------------------
+
+
 def _claim_owner_if_needed(business_id: int, chat_id: int) -> bool:
     """Onboarding step 3: the first person to message a freshly-connected bot
     (whose owner_chat_id is still unset) becomes its owner. Returns True if
@@ -210,7 +227,6 @@ def _claim_owner_if_needed(business_id: int, chat_id: int) -> bool:
         db.close()
 
 
-#====> /start command: claim an admin invite if the user has a valid token
 def _claim_admin_invite(business_id: int, chat_id: int, token: str, name: str | None) -> bool:
     """Deep-link admin invite (t.me/{bot}?start=admin_{token}): consumes a
     one-time token to add a new admin who'll receive owner-style notifications.
@@ -227,7 +243,7 @@ def _claim_admin_invite(business_id: int, chat_id: int, token: str, name: str | 
     finally:
         db.close()
 
-#====> /start command: get the business's configured welcome message
+
 def _welcome_message_for(business_id: int) -> str:
     """The business's configured English welcome message, falling back to
     whichever one is set, then a generic greeting.
@@ -246,7 +262,7 @@ def _welcome_message_for(business_id: int) -> str:
         db.close()
 
 
-#====> /start command: handle the three cases (admin invite, claim owner, or welcome)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/start — Telegram's own "Start" button sends this. Three cases:
     an admin deep-link payload, claiming ownership if nobody has linked this
@@ -295,6 +311,11 @@ async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(str(chat_id))
 
 
+# ---------------------------------------------------------------------------
+# Runtime error handling and application wiring
+# ---------------------------------------------------------------------------
+
+
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Safety net: log any unexpected exception and apologize instead of crashing."""
     business_id = context.application.bot_data.get("business_id")
@@ -311,6 +332,7 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def build_application(token: str, business_id: int, owner_chat_id: int | None) -> Application:
+    """Build one python-telegram-bot Application bound to a single business."""
     app = Application.builder().token(token).build()
     app.bot_data["business_id"] = business_id
     app.bot_data["owner_chat_id"] = owner_chat_id

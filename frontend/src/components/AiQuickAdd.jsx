@@ -1,4 +1,4 @@
-import { Sparkles, Trash2, Wand2 } from "lucide-react";
+import { Trash2, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { apiFetch, ApiError } from "../api/client";
 import Button from "./Button";
@@ -14,7 +14,7 @@ let nextDraftId = 0;
 function AiDraftedChip() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-1.5 py-0.5 text-[10px] font-semibold text-warning">
-      <Sparkles className="h-2.5 w-2.5" strokeWidth={2.5} />
+      <Wand2 className="h-2.5 w-2.5" strokeWidth={2.5} />
       AI-drafted
     </span>
   );
@@ -188,7 +188,7 @@ export default function AiQuickAdd({ onSaved, onCancel, autoFocus }) {
     return (
       <div className="rounded-xl border border-accent/30 bg-accent-soft/40 p-5">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-accent-dark" strokeWidth={2} />
+          <Wand2 className="h-5 w-5 text-accent-dark" strokeWidth={2} />
           <h3 className="font-heading font-bold text-ink">Add with AI</h3>
         </div>
         <p className="mt-1 text-sm text-ink-muted">
@@ -214,9 +214,14 @@ export default function AiQuickAdd({ onSaved, onCancel, autoFocus }) {
         )}
 
         <div className="mt-3 flex items-center gap-2">
-          <Button onClick={handleAnalyze} disabled={analyzing || !text.trim()}>
+          <Button
+            onClick={handleAnalyze}
+            disabled={!text.trim()}
+            isLoading={analyzing}
+            loadingLabel="Analyzing..."
+          >
             <Wand2 className="h-4 w-4" strokeWidth={2.5} />
-            {analyzing ? "Analyzing..." : "Analyze"}
+            Analyze
           </Button>
           {onCancel && (
             <Button variant="ghost" onClick={onCancel} disabled={analyzing}>
@@ -266,12 +271,15 @@ export default function AiQuickAdd({ onSaved, onCancel, autoFocus }) {
       </div>
 
       <div className="mt-4 flex items-center gap-2">
-        <Button onClick={handleAddSelected} disabled={saving || selectedCount === 0}>
-          {saving
-            ? "Adding..."
-            : selectedCount === drafts.length
-              ? `Add all (${drafts.length})`
-              : `Add selected (${selectedCount})`}
+        <Button
+          onClick={handleAddSelected}
+          disabled={selectedCount === 0}
+          isLoading={saving}
+          loadingLabel="Adding..."
+        >
+          {selectedCount === drafts.length
+            ? `Add all (${drafts.length})`
+            : `Add selected (${selectedCount})`}
         </Button>
         <Button variant="ghost" onClick={reset} disabled={saving}>
           Cancel

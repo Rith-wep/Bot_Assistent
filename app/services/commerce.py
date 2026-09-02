@@ -1,3 +1,10 @@
+"""Commerce service layer for product-retail businesses.
+
+This module owns the core order flow rules used by both HTTP APIs and
+Telegram bot side effects. Routers translate service exceptions into HTTP
+responses; this file stays focused on tenant-safe business behavior.
+"""
+
 from decimal import Decimal
 from datetime import timedelta
 import logging
@@ -20,12 +27,21 @@ from app.services.notifications import notify_recipients
 
 logger = logging.getLogger(__name__)
 
+CART_TTL_HOURS = 24
+
+
+# ---------------------------------------------------------------------------
+# Formatting and scoped query helpers
+# ---------------------------------------------------------------------------
+
 
 def _money(value: Decimal) -> str:
+    """Format Decimal prices for AI prompts and owner notifications."""
     return f"${value.quantize(Decimal('0.01'))}"
 
 
 def _variant_query(db: Session, product_id: int, variant_id: int, lock_stock: bool):
+    """Build the active variant lookup, optionally locking the stock row."""
     query = db.query(ProductVariant).filter(
         ProductVariant.id == variant_id,
         ProductVariant.product_id == product_id,
@@ -34,7 +50,13 @@ def _variant_query(db: Session, product_id: int, variant_id: int, lock_stock: bo
     return query.with_for_update() if lock_stock else query
 
 
+# ---------------------------------------------------------------------------
+# Read helpers used by responses and AI context
+# ---------------------------------------------------------------------------
+
+
 def delivery_zone_name(db: Session, business_id: int, zone_id: int | None) -> str | None:
+    """Return the tenant-scoped delivery zone display name for an order."""
     if zone_id is None:
         return None
     zone = (
@@ -48,6 +70,7 @@ def delivery_zone_name(db: Session, business_id: int, zone_id: int | None) -> st
 
 
 def build_retail_prompt_context(db: Session, business_id: int) -> str:
+    """Build the live catalog, stock, photo, and delivery context for the AI."""
     products = (
         db.query(Product)
         .filter(Product.business_id == business_id, Product.is_active.is_(True))
@@ -110,6 +133,11 @@ def build_retail_prompt_context(db: Session, business_id: int) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# Order validation, pricing, stock locking, and creation
+# ---------------------------------------------------------------------------
+
+
 def create_validated_order(
     db: Session,
     business_id: int,
@@ -123,6 +151,7 @@ def create_validated_order(
     payment_method,
     lock_stock: bool = True,
 ) -> Order:
+    """Create one tenant-scoped order after validating stock, prices, and delivery."""
     conversation = (
         db.query(Conversation)
         .filter(Conversation.id == conversation_id, Conversation.business_id == business_id)
@@ -251,7 +280,13 @@ def create_validated_order(
     return order
 
 
+# ---------------------------------------------------------------------------
+# API serialization helpers
+# ---------------------------------------------------------------------------
+
+
 def order_to_dict(db: Session, business_id: int, order: Order) -> dict:
+    """Serialize an Order with computed fields expected by frontend/API schemas."""
     return {
         "id": order.id,
         "conversation_id": order.conversation_id,
@@ -270,10 +305,13 @@ def order_to_dict(db: Session, business_id: int, order: Order) -> dict:
     }
 
 
-CART_TTL_HOURS = 24
+# ---------------------------------------------------------------------------
+# Stateful cart context helpers
+# ---------------------------------------------------------------------------
 
 
 def _normalize_cart_item(item: dict) -> dict | None:
+    """Normalize one AI-extracted cart item before merging into cart state."""
     product_id = item.get("product_id")
     if not product_id:
         return None
@@ -286,6 +324,7 @@ def _normalize_cart_item(item: dict) -> dict | None:
 
 
 def _merge_items(current_items: list[dict], patch_items: list[dict]) -> list[dict]:
+    """Merge updated product/variant quantities into existing cart items."""
     merged = {
         (item.get("product_id"), item.get("variant_id")): dict(item)
         for item in current_items
@@ -306,6 +345,7 @@ def merge_cart_patch(
     conversation_id: int,
     patch: dict | None,
 ) -> ConversationCart:
+    """Apply one AI-extracted customer update to the persistent cart context."""
     repo = ConversationCartRepository(db, business_id)
     cart = repo.get_for_conversation(conversation_id)
     if cart is None:
@@ -339,6 +379,7 @@ def merge_cart_patch(
 
 
 def cart_ready_for_order(cart: ConversationCart) -> bool:
+    """Return True only when the cart contains every field required for an order."""
     state = cart.state or {}
     return bool(
         state.get("items")
@@ -356,6 +397,7 @@ def create_order_from_cart(
     conversation_id: int,
     cart: ConversationCart,
 ) -> Order:
+    """Create an order from a previously accumulated conversation cart state."""
     state = cart.state or {}
     return create_validated_order(
         db,
@@ -370,7 +412,13 @@ def create_order_from_cart(
     )
 
 
+# ---------------------------------------------------------------------------
+# Owner notification helpers
+# ---------------------------------------------------------------------------
+
+
 def order_summary(order: Order) -> str:
+    """Build the human-readable order summary sent to owners/admins."""
     lines = [f"Order #{order.id}", f"Customer: {order.customer_name or 'Unknown'}"]
     if order.phone:
         lines.append(f"Phone: {order.phone}")
@@ -398,6 +446,7 @@ async def notify_order(
     owner_chat_id: int | None,
     order: Order,
 ) -> None:
+    """Notify the business owner/admins that a new order has been created."""
     business = db.get(Business, business_id)
     await notify_recipients(
         db,
