@@ -8,7 +8,7 @@ from app.models.knowledge_item import KnowledgeItem
 from app.models.lead import Lead
 from app.models.message import Message
 from app.models.delivery_zone import DeliveryZone
-from app.models.order import Order, OrderStatus, PaymentMethod
+from app.models.order import CustomerChannel, Order, OrderItem, OrderStatus, PaymentMethod, PaymentStatus
 from app.models.product import Product, ProductVariant
 from app.models.question_cluster import QuestionCluster
 from app.models.unanswered_question import UnansweredQuestion
@@ -29,8 +29,11 @@ __all__ = [
     "ProductVariant",
     "DeliveryZone",
     "Order",
+    "OrderItem",
     "OrderStatus",
     "PaymentMethod",
+    "PaymentStatus",
+    "CustomerChannel",
     "Admin",
     "AdminInvite",
     "UnansweredQuestion",

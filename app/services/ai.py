@@ -30,6 +30,7 @@ from app.models.business import Business, BusinessType
 from app.models.ai_profile import AIProfile
 from app.models.business_rule import BusinessRule
 from app.models.conversation import Conversation
+from app.schemas.ai_actions import RetailAIAction
 from app.services import conversation_state, gaps
 from app.services.commerce import build_retail_prompt_context
 from app.services.knowledge import build_business_info_text
@@ -104,13 +105,36 @@ _PERSONALITY_INSTRUCTIONS = {
     "sales": "energetic, helpful, and gently conversion-focused",
 }
 
-_ENGLISH_ONLY_REPLY_NOTE = (
-    "\n\n## Temporary language override\n"
-    "For now, reply to customers in English only. This overrides any instruction "
-    "to reply in Khmer, mirror the customer's language, or use bilingual replies. "
-    "If the customer writes in Khmer or another language, understand their message "
-    "as best you can, but answer in clear, natural English."
-)
+_LANGUAGE_MODE_INSTRUCTIONS = {
+    "mirror": (
+        "\n\n## Language behavior\n"
+        "Understand customer messages in any language, including Khmer, English, "
+        "mixed Khmer-English, and Khmer written with Latin letters. Reply in the "
+        "same language the customer mainly used. If the customer mixes languages, "
+        "reply naturally in the same mixed style. Keep internal reasoning and any "
+        "structured action fields language-neutral; never fail just because the "
+        "customer used another language."
+    ),
+    "khmer_default": (
+        "\n\n## Language behavior\n"
+        "Understand customer messages in any language, including Khmer, English, "
+        "mixed Khmer-English, and Khmer written with Latin letters. Reply in Khmer "
+        "by default. If the customer clearly asks for English, reply in English for "
+        "that turn. Keep Khmer polite, natural, and easy for Cambodian customers."
+    ),
+    "english": (
+        "\n\n## Language behavior\n"
+        "Understand customer messages in any language, including Khmer, English, "
+        "mixed Khmer-English, and Khmer written with Latin letters. Reply in clear, "
+        "natural English unless the business later changes this language setting."
+    ),
+    "both": (
+        "\n\n## Language behavior\n"
+        "Understand customer messages in any language, including Khmer, English, "
+        "mixed Khmer-English, and Khmer written with Latin letters. Reply bilingually: "
+        "first a concise Khmer answer, then a concise English answer with the same facts."
+    ),
+}
 
 _CLASSIFIER_INSTRUCTION = (
     "You are an internal classifier for a customer support conversation. You are "
@@ -209,7 +233,7 @@ _EXTRACT_INSTRUCTION = (
     "Facebook About text, a menu, or rough notes) into structured knowledge items "
     "for their customer-support AI assistant. The source text may be English, "
     "Khmer, or a mix, and may use Latin-letter transliterated Khmer.\n\n"
-    "For each distinct fact in the text (a service with its price, an FAQ, "
+    "For each distinct labeled section or fact in the text (a service with its price, an FAQ, "
     "opening hours, the location, a policy, or another standalone fact), output "
     "one item with: category (one of service/faq/hours/location/policy/other), "
     "a short title, price if one is present for that item (normalize to a plain "
@@ -226,6 +250,8 @@ _EXTRACT_INSTRUCTION = (
     "warm, and natural, in the same register a helpful shop assistant would use, "
     "with correct Khmer honorifics when writing Khmer — and set that language's "
     "ai_generated flag to true. Never leave both content_en and content_km empty.\n\n"
+    "Do not stop after location and opening hours. Include delivery, payment, "
+    "return policy, product/service notes, and every FAQ when they are present.\n\n"
     f"Output at most {MAX_EXTRACT_ITEMS} items. If the text contains no usable "
     "business information, output an empty items list."
 )
@@ -250,10 +276,137 @@ _PRODUCT_EXTRACT_INSTRUCTION = (
 # ---------------------------------------------------------------------------
 
 
+def _clean_numeric_price(value) -> float:
+    """Accept common AI/user price formats while returning a schema-safe number."""
+    if value in (None, ""):
+        return 0
+    if isinstance(value, (int, float)):
+        return max(0, float(value))
+    text = str(value).strip()
+    match = re.search(r"\d+(?:\.\d+)?", text.replace(",", ""))
+    return max(0, float(match.group(0))) if match else 0
+
+
+def _clean_optional_numeric_price(value) -> float | None:
+    if value in (None, ""):
+        return None
+    return _clean_numeric_price(value)
+
+
+def _clean_int(value, default: int = 0) -> int:
+    if value in (None, ""):
+        return default
+    if isinstance(value, int):
+        return value
+    match = re.search(r"-?\d+", str(value))
+    return int(match.group(0)) if match else default
+
+
+_SECTION_CATEGORY_BY_TITLE = {
+    "location": "location",
+    "business location": "location",
+    "shop address": "location",
+    "address": "location",
+    "opening hours": "hours",
+    "hours": "hours",
+    "delivery": "policy",
+    "payment": "policy",
+    "return policy": "policy",
+    "return or exchange policy": "policy",
+    "exchange policy": "policy",
+    "best-selling product": "service",
+    "best selling product": "service",
+    "new arrival": "service",
+    "product variant or size": "service",
+}
+
+
+def _title_from_label(label: str) -> str:
+    return re.sub(r"\s+", " ", label.strip()).title()
+
+
+def _fallback_extract_labeled_knowledge(text: str) -> list[dict]:
+    """Parse simple labeled notes when the model under-extracts JSON output."""
+    sections = re.split(r"(?m)^\s*([A-Za-z][A-Za-z\s/-]{1,60}|FAQ)\s*:\s*$", text)
+    drafts = []
+    index = 0
+    while index + 2 < len(sections):
+        label = sections[index + 1].strip()
+        body = sections[index + 2].strip()
+        index += 2
+        if not body:
+            continue
+
+        label_key = label.lower()
+        if label_key == "faq":
+            question_match = re.search(r"(?im)^\s*Q(?:uestion)?\s*:\s*(.+)$", body)
+            answer_match = re.search(r"(?ims)^\s*A(?:nswer)?\s*:\s*(.+)$", body)
+            title = question_match.group(1).strip() if question_match else "FAQ"
+            content_en = answer_match.group(1).strip() if answer_match else body
+            category = "faq"
+        else:
+            title = _title_from_label(label)
+            content_en = body
+            category = _SECTION_CATEGORY_BY_TITLE.get(label_key, "other")
+
+        drafts.append(
+            {
+                "category": category,
+                "title": title[:255],
+                "price": None,
+                "content_en": content_en,
+                "content_km": None,
+                "content_en_ai_generated": False,
+                "content_km_ai_generated": False,
+            }
+        )
+    return drafts[:MAX_EXTRACT_ITEMS]
+
+
 def _template_extraction_hint(business_type: str) -> str:
     """Return industry-specific guidance appended to the knowledge extractor."""
     from app.services.knowledge_templates import get_templates
     return f"\n\nIndustry-specific extraction guidance: {get_templates(business_type)['extractor_hint']}."
+
+
+async def _json_extraction_call(system_instruction: str, text: str, required_key: str) -> dict | None:
+    """Ask the model for strict JSON, retrying once with a smaller repair prompt."""
+    messages = [
+        {"role": "system", "content": system_instruction},
+        {"role": "user", "content": text},
+    ]
+    try:
+        response = await _client.chat.completions.create(
+            model=settings.ai_model,
+            messages=messages,
+            response_format={"type": "json_object"},
+        )
+    except Exception:
+        logger.warning("Groq JSON extraction call failed, retrying once", exc_info=True)
+        repair_instruction = (
+            f"Return ONLY one valid JSON object with a top-level `{required_key}` array. "
+            "Do not include markdown, explanation, comments, trailing commas, or text outside JSON. "
+            "If unsure, return an empty array."
+        )
+        try:
+            response = await _client.chat.completions.create(
+                model=settings.ai_model,
+                messages=[
+                    {"role": "system", "content": repair_instruction},
+                    {"role": "user", "content": text},
+                ],
+                response_format={"type": "json_object"},
+            )
+        except Exception:
+            logger.warning("Groq JSON extraction retry failed", exc_info=True)
+            return None
+
+    try:
+        payload = json.loads(response.choices[0].message.content or "{}")
+    except Exception:
+        logger.warning("Groq JSON extraction returned unparsable content", exc_info=True)
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 async def extract_knowledge_items(text: str, business_type: str = "professional_other") -> Optional[list[dict]]:
@@ -263,65 +416,78 @@ async def extract_knowledge_items(text: str, business_type: str = "professional_
     Returns None on failure (caller should surface a "could not analyze" error);
     returns a possibly-empty list on success, capped at MAX_EXTRACT_ITEMS.
     """
-    try:
-        response = await _client.chat.completions.create(
-            model=settings.ai_model,
-            messages=[
-                {"role": "system", "content": _EXTRACT_INSTRUCTION + _template_extraction_hint(business_type)},
-                {"role": "user", "content": text},
-            ],
-            response_format={"type": "json_object"},
-        )
-        items = json.loads(response.choices[0].message.content or "{}")["items"]
-    except Exception:
-        logger.warning("Groq knowledge extraction call failed", exc_info=True)
+    payload = await _json_extraction_call(
+        _EXTRACT_INSTRUCTION + _template_extraction_hint(business_type),
+        text,
+        "items",
+    )
+    if payload is None:
         return None
+    items = payload.get("items", [])
+    if not isinstance(items, list):
+        logger.warning("Groq knowledge extraction returned non-list items: %s", type(items).__name__)
+        return []
 
     cleaned = []
     for item in items[:MAX_EXTRACT_ITEMS]:
+        if not isinstance(item, dict):
+            logger.warning("Skipping invalid extracted knowledge item type=%s value=%r", type(item).__name__, item)
+            continue
         if item.get("category") not in _KNOWLEDGE_CATEGORIES:
             item["category"] = "other"
         if not (item.get("content_en") or "").strip() and not (item.get("content_km") or "").strip():
             continue
         cleaned.append(item)
+
+    fallback_items = _fallback_extract_labeled_knowledge(text)
+    existing_titles = {str(item.get("title", "")).strip().lower() for item in cleaned}
+    for item in fallback_items:
+        title_key = item["title"].strip().lower()
+        if title_key not in existing_titles and len(cleaned) < MAX_EXTRACT_ITEMS:
+            cleaned.append(item)
+            existing_titles.add(title_key)
     return cleaned
 
 
 async def extract_products(text: str) -> Optional[list[dict]]:
     """Quick-add with AI for retail catalogs; returns reviewed drafts only."""
-    try:
-        response = await _client.chat.completions.create(
-            model=settings.ai_model,
-            messages=[
-                {"role": "system", "content": _PRODUCT_EXTRACT_INSTRUCTION},
-                {"role": "user", "content": text},
-            ],
-            response_format={"type": "json_object"},
-        )
-        products = json.loads(response.choices[0].message.content or "{}")["products"]
-    except Exception:
-        logger.warning("Groq product extraction call failed", exc_info=True)
+    payload = await _json_extraction_call(_PRODUCT_EXTRACT_INSTRUCTION, text, "products")
+    if payload is None:
         return None
+    products = payload.get("products", [])
+
+    if not isinstance(products, list):
+        logger.warning("Groq product extraction returned non-list products: %s", type(products).__name__)
+        return []
 
     cleaned = []
     for index, product in enumerate(products[:MAX_EXTRACT_PRODUCTS]):
+        if not isinstance(product, dict):
+            logger.warning("Skipping invalid extracted product type=%s value=%r", type(product).__name__, product)
+            continue
         if not (product.get("name_en") or "").strip():
             continue
-        product["base_price"] = product.get("base_price") or 0
-        product["photo_urls"] = [
-            url.strip() for url in product.get("photo_urls", []) if url and url.strip()
-        ][:8]
+        product["base_price"] = _clean_numeric_price(product.get("base_price"))
+        raw_photo_urls = product.get("photo_urls") or []
+        if isinstance(raw_photo_urls, str):
+            raw_photo_urls = [raw_photo_urls]
+        if not isinstance(raw_photo_urls, list):
+            raw_photo_urls = []
+        product["photo_urls"] = [url.strip() for url in raw_photo_urls if url and str(url).strip()][:8]
         product["is_active"] = bool(product.get("is_active", True))
-        product["sort_order"] = int(product.get("sort_order") or index)
+        product["sort_order"] = _clean_int(product.get("sort_order"), index)
         variants = []
         for variant in product.get("variants", []):
+            if not isinstance(variant, dict):
+                logger.warning("Skipping invalid extracted variant type=%s value=%r", type(variant).__name__, variant)
+                continue
             if not (variant.get("variant_label") or "").strip():
                 continue
             variants.append(
                 {
                     "variant_label": variant["variant_label"],
-                    "price_override": variant.get("price_override"),
-                    "stock_quantity": max(0, int(variant.get("stock_quantity") or 0)),
+                    "price_override": _clean_optional_numeric_price(variant.get("price_override")),
+                    "stock_quantity": max(0, _clean_int(variant.get("stock_quantity"), 0)),
                     "sku": variant.get("sku"),
                     "is_active": bool(variant.get("is_active", True)),
                 }
@@ -345,6 +511,9 @@ def _build_system_instruction(business: Business, db: Session, handoff_active: b
     ).order_by(BusinessRule.sort_order, BusinessRule.id).all()
 
     instruction = _RULES_TEXT
+    language_mode = profile.language_mode if profile else (
+        "both" if business.default_language == "both" else "khmer_default" if business.default_language == "km" else "english"
+    )
     if profile:
         instruction += (
             f"\n\n## AI Profile\nYou are '{profile.assistant_name}', {profile.assistant_role}.\n"
@@ -353,7 +522,7 @@ def _build_system_instruction(business: Business, db: Session, handoff_active: b
         )
     elif business.assistant_display_name:
         instruction += f"\n\nYou are '{business.assistant_display_name}', the customer assistant for this business."
-    instruction += _ENGLISH_ONLY_REPLY_NOTE
+    instruction += _LANGUAGE_MODE_INSTRUCTIONS.get(language_mode, _LANGUAGE_MODE_INSTRUCTIONS["mirror"])
     from app.services.knowledge_templates import get_templates
     template = get_templates(business.business_type.value)
     instruction += f"\n\n## Industry guidance\nUse a {template['tone']} tone appropriate for this business type."
@@ -366,6 +535,10 @@ def _build_system_instruction(business: Business, db: Session, handoff_active: b
             "Suggest COD by default. Never promise a variant that has stock 0. "
             "If product, variant, stock, address, or delivery zone matching is "
             "ambiguous, ask a short confirmation question instead of guessing. "
+            "During ordering, ask only for the missing information. Do not repeat "
+            "details the customer already gave. When the customer gives address, "
+            "quantity, name, phone, or payment, acknowledge briefly and ask for the "
+            "next missing field only. Keep order collection friendly, short, and not repetitive. "
             "Do not tell the customer an order is created until all details are "
             "confirmed. Product photos can be sent by this Telegram channel when "
             "the catalog says photos are available, so never say you cannot send "
@@ -452,18 +625,25 @@ async def _classify(contents: list[dict[str, str]], assistant_reply: str) -> Opt
 
 _RETAIL_CLASSIFIER_INSTRUCTION = (
     "You are an internal order classifier for a product retail chat. Output one "
-    "valid JSON object with keys mentioned_product_ids, cart_patch, and "
-    "confirmed_order. cart_patch should contain only details the customer clearly "
-    "provided or changed in this turn: items [{product_id, variant_id, qty}], "
-    "delivery_zone_id, delivery_address_text, customer_name, phone, and "
-    "payment_method cod/prepaid. Use cart_patch to update an existing cart; do "
-    "not restart from scratch just because the customer changes size or quantity. "
-    "Set confirmed_order=true only when the customer clearly confirms they want "
-    "to place the order after product/variant/quantity/address/payment are known. "
-    "Never guess IDs; use null or omit fields if ambiguous. Include mentioned_product_ids as an "
-    "array of product IDs the assistant discussed so the channel can send photos. "
-    "If the customer asks to see products, see photos, browse, or asks what products "
-    "are available, include the IDs of the relevant products the assistant described."
+    "valid JSON object matching exactly this shape: "
+    "{mentioned_product_ids: number[], cart_patch: object|null, confirmed_order: boolean, "
+    "confidence: number between 0 and 1, missing_fields: string[], customer_language: string|null}. "
+    "cart_patch may contain only details the customer clearly provided or changed in this turn: "
+    "items [{product_id, variant_id, qty}], delivery_zone_id, delivery_address_text, "
+    "customer_name, phone, and payment_method cod/prepaid. Use cart_patch to update an existing "
+    "cart; do not restart from scratch just because the customer changes size or quantity. "
+    "Set confirmed_order=true only when the customer clearly confirms they want to place the "
+    "order after product/variant/quantity/address/payment are known, including replies like yes, "
+    "confirm, ok, or place order when they follow an order confirmation summary. Do not set "
+    "confirmed_order=true for polite closing messages like thanks unless they clearly approve the "
+    "order. Set missing_fields to any "
+    "required order details still missing. Delivery zone is optional if none was discussed. "
+    "Set confidence below 0.7 if the product, variant, "
+    "quantity, address, payment, language, or customer intent is ambiguous. Never guess IDs; use "
+    "null or omit fields if ambiguous. Include mentioned_product_ids as an array of product IDs "
+    "the assistant discussed so the channel can send photos. If the customer asks to see products, "
+    "see photos, browse, or asks what products are available, include the IDs of the relevant "
+    "products the assistant described."
 )
 
 
@@ -479,7 +659,20 @@ async def _classify_retail(contents: list[dict[str, str]], assistant_reply: str)
             ],
             response_format={"type": "json_object"},
         )
-        return json.loads(response.choices[0].message.content or "{}")
+        payload = json.loads(response.choices[0].message.content or "{}")
+        action = RetailAIAction.model_validate(payload)
+        if action.confidence < 0.7 and action.cart_patch is not None:
+            logger.info(
+                "retail_ai_action_low_confidence confidence=%s missing_fields=%s",
+                action.confidence,
+                action.missing_fields,
+            )
+            action.cart_patch = None
+            action.confirmed_order = False
+        if action.confirmed_order and action.missing_fields:
+            logger.info("retail_ai_action_blocked_missing_fields fields=%s", action.missing_fields)
+            action.confirmed_order = False
+        return action.to_legacy_dict()
     except Exception:
         logger.warning("Groq retail classification call failed", exc_info=True)
         return None

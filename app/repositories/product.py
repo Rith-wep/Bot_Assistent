@@ -16,14 +16,32 @@ class ProductRepository(TenantRepository[Product]):
     def get_variant(self, variant_id: int) -> ProductVariant | None:
         return (
             self.db.query(ProductVariant)
-            .join(Product, Product.id == ProductVariant.product_id)
-            .filter(Product.business_id == self.business_id, ProductVariant.id == variant_id)
+            .filter(ProductVariant.business_id == self.business_id, ProductVariant.id == variant_id)
             .first()
         )
+
+    def list_variants_for_products(
+        self, product_ids: list[int], active_only: bool = False
+    ) -> list[ProductVariant]:
+        if not product_ids:
+            return []
+        query = self.db.query(ProductVariant).filter(
+            ProductVariant.business_id == self.business_id,
+            ProductVariant.product_id.in_(product_ids),
+        )
+        if active_only:
+            query = query.filter(ProductVariant.is_active.is_(True))
+        return query.order_by(ProductVariant.product_id, ProductVariant.id).all()
 
     def replace_variants(self, product: Product, variants: list[dict]) -> None:
         self.db.query(ProductVariant).filter(ProductVariant.product_id == product.id).delete()
         for variant in variants:
             fields = {k: v for k, v in variant.items() if k != "id"}
-            self.db.add(ProductVariant(product_id=product.id, **fields))
+            self.db.add(
+                ProductVariant(
+                    business_id=self.business_id,
+                    product_id=product.id,
+                    **fields,
+                )
+            )
         self.db.flush()

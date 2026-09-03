@@ -4,6 +4,7 @@ import {
   ImagePlus,
   Pencil,
   Plus,
+  Search,
   Trash2,
   Upload,
   Wand2,
@@ -216,7 +217,85 @@ function VariantsTable({ variants, onUpdate, onAdd, onRemove }) {
           <p className="text-sm text-ink-muted">Manage sizes, colors, SKUs, and stock.</p>
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="divide-y divide-gray-100 md:hidden">
+        {variants.map((variant, index) => {
+          const stock = Number(variant.stock_quantity || 0);
+          return (
+            <div key={index} className="space-y-3 p-4">
+              <Field label="Variant Label">
+                <input
+                  className={inputClass}
+                  placeholder="Red / Size M"
+                  value={variant.variant_label}
+                  onChange={(event) => onUpdate(index, "variant_label", event.target.value)}
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Price Override">
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-muted">
+                      $
+                    </span>
+                    <input
+                      className={`${inputClass} pl-7`}
+                      placeholder="Optional"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={variant.price_override || ""}
+                      onChange={(event) => onUpdate(index, "price_override", event.target.value)}
+                    />
+                  </div>
+                </Field>
+                <Field label="Stock">
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="0"
+                    value={variant.stock_quantity}
+                    onChange={(event) => onUpdate(index, "stock_quantity", event.target.value)}
+                  />
+                </Field>
+              </div>
+              <Field label="SKU">
+                <input
+                  className={inputClass}
+                  placeholder="SKU"
+                  value={variant.sku || ""}
+                  onChange={(event) => onUpdate(index, "sku", event.target.value)}
+                />
+              </Field>
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+                    stock === 0
+                      ? "bg-red-50 text-red-700 ring-red-100"
+                      : "bg-emerald-50 text-emerald-700 ring-emerald-100"
+                  }`}
+                >
+                  {stock === 0 ? "Out of stock" : "In stock"}
+                </span>
+                <div className="flex items-center gap-3">
+                  <Toggle
+                    checked={variant.is_active}
+                    onChange={(value) => onUpdate(index, "is_active", value)}
+                    label="Toggle variant active state"
+                  />
+                  <button
+                    type="button"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-ink-muted transition-colors hover:border-red-100 hover:bg-error-soft hover:text-error"
+                    onClick={() => onRemove(index)}
+                    aria-label="Remove variant"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[900px] table-fixed text-left text-sm">
           <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-ink-muted">
             <tr>
@@ -716,19 +795,42 @@ export default function Products() {
   } = useCachedApi("/products", []);
   const [drawerProduct, setDrawerProduct] = useState(null);
   const [showAi, setShowAi] = useState(false);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const error = loadError instanceof ApiError ? loadError.message : loadError;
+  const categories = Array.from(
+    new Set((products || []).map((product) => product.category).filter(Boolean))
+  );
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const filteredProducts = (products || []).filter((product) => {
+    const needle = query.trim().toLowerCase();
+    const matchesQuery = !needle
+      || [product.name_en, product.name_km, product.category]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(needle));
+    const matchesStatus =
+      statusFilter === "all"
+      || (statusFilter === "active" && product.is_active)
+      || (statusFilter === "draft" && !product.is_active);
+    const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
+    return matchesQuery && matchesStatus && matchesCategory;
+  });
 
   async function reload() {
     setProducts(await apiFetch("/products"));
   }
 
   async function save(product, id) {
-    await apiFetch(id ? `/products/${id}` : "/products", {
+    const saved = await apiFetch(id ? `/products/${id}` : "/products", {
       method: id ? "PUT" : "POST",
       body: product,
     });
     setDrawerProduct(null);
-    await reload();
+    setProducts((current) => {
+      const existing = current || [];
+      if (id) return existing.map((item) => (item.id === id ? saved : item));
+      return [saved, ...existing];
+    });
   }
 
   async function remove(id) {
@@ -761,6 +863,39 @@ export default function Products() {
 
       {error && <p className="mb-4 rounded-lg bg-error-soft px-3 py-2 text-sm text-error">{error}</p>}
 
+      <div className="mb-5 grid gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm lg:grid-cols-[minmax(0,1fr)_180px_180px]">
+        <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+          <Search className="h-4 w-4 text-ink-muted" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search products"
+            className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-muted"
+          />
+        </div>
+        <select
+          className={inputClass}
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+        >
+          <option value="all">All categories</option>
+          {categories.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+        <select
+          className={inputClass}
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+        >
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="draft">Draft</option>
+        </select>
+      </div>
+
       {showAi && (
         <AiProductAdd
           onSaved={async () => {
@@ -779,9 +914,15 @@ export default function Products() {
           title="No products yet"
           description="Add products manually or paste a product list and let AI prepare variants for review."
         />
+      ) : filteredProducts.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          title="No products match"
+          description="Try changing the search, category, or status filter."
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <ProductCard
               key={product.id}
               product={product}

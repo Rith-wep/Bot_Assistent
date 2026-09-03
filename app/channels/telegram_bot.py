@@ -18,6 +18,8 @@ from app.models.product import Product
 from app.repositories.admin import AdminInviteRepository, AdminRepository
 from app.services import conversation_state, handoff, leads
 from app.services.commerce import (
+    cart_confirmation_summary,
+    cart_missing_order_fields,
     cart_ready_for_order,
     create_order_from_cart,
     merge_cart_patch,
@@ -45,7 +47,8 @@ def _looks_like_photo_request(text: str) -> bool:
 
 def _product_ids_for_photo_reply(db, business_id: int, message: str, commerce: dict | None) -> list[int]:
     """Choose which product photos to send after the AI describes products."""
-    ids = list(dict.fromkeys((commerce or {}).get("mentioned_product_ids") or []))
+    commerce_payload = commerce if isinstance(commerce, dict) else {}
+    ids = list(dict.fromkeys(commerce_payload.get("mentioned_product_ids") or []))
     if ids:
         return ids[:3]
     if not _looks_like_photo_request(message):
@@ -116,13 +119,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         db.commit()
 
-        if commerce and (commerce.get("cart_patch") or commerce.get("order")):
+        if isinstance(commerce, dict) and (
+            commerce.get("cart_patch") or commerce.get("order") or commerce.get("confirmed_order")
+        ):
             cart_patch = commerce.get("cart_patch") or commerce.get("order")
+            confirmed_order = bool(commerce.get("confirmed_order"))
             try:
                 cart = merge_cart_patch(db, business_id, conversation.id, cart_patch)
-                if commerce.get("confirmed_order") and cart_ready_for_order(cart):
+                state = dict(cart.state or {})
+                missing_fields = cart_missing_order_fields(cart)
+                awaiting_confirmation = bool(state.get("awaiting_order_confirmation"))
+                if confirmed_order and cart_ready_for_order(cart) and awaiting_confirmation:
                     order = create_order_from_cart(db, business_id, conversation.id, cart)
+                    cart.state = {"items": []}
                     await notify_order(db, business_id, context.bot, owner_chat_id, order)
+                elif cart_ready_for_order(cart) and not awaiting_confirmation:
+                    state["awaiting_order_confirmation"] = True
+                    cart.state = state
+                    await update.message.reply_text(cart_confirmation_summary(db, business_id, cart))
+                elif confirmed_order and missing_fields:
+                    logger.info(
+                        "retail_order_confirmation_blocked business_id=%s conversation_id=%s missing_fields=%s",
+                        business_id,
+                        conversation.id,
+                        missing_fields,
+                    )
                 db.commit()
             except (BusinessRuleError, HTTPException) as exc:
                 detail = getattr(exc, "detail", str(exc))
@@ -134,10 +155,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     exc_info=True,
                 )
                 db.rollback()
-                await update.message.reply_text(
-                    str(detail)
-                    or "I could not complete the order yet. Please confirm the item, delivery, and payment details."
-                )
             except Exception:
                 logger.exception(
                     "Retail cart/order side effect failed business_id=%s conversation_id=%s",
@@ -145,9 +162,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     conversation.id,
                 )
                 db.rollback()
-                await update.message.reply_text(
-                    "I saved your message, but I could not complete the order yet. Please confirm the item, delivery address, and payment method again."
-                )
 
         try:
             if handoff_reason:

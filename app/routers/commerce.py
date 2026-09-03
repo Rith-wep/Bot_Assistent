@@ -9,14 +9,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentUser, get_current_user
+from app.core.time import utcnow
 from app.db.session import get_db
 from app.models.business import Business, BusinessType
-from app.models.order import OrderStatus
-from app.models.product import ProductVariant
+from app.models.order import CustomerChannel, OrderStatus, PaymentStatus
 from app.repositories.delivery_zone import DeliveryZoneRepository
 from app.repositories.order import OrderRepository
 from app.repositories.product import ProductRepository
 from app.schemas.commerce import (
+    CatalogResponse,
     DeliveryZoneCreate,
     DeliveryZoneOut,
     DeliveryZoneUpdate,
@@ -31,7 +32,7 @@ from app.schemas.commerce import (
     ProductUpdate,
 )
 from app.services.ai import clear_prompt_context_cache, extract_products
-from app.services.commerce import create_validated_order, order_to_dict
+from app.services.commerce import catalog_categories, create_validated_order, list_catalog_products, order_to_dict
 from app.services.exceptions import BusinessRuleError
 
 router = APIRouter(prefix="/api", tags=["commerce"])
@@ -51,12 +52,7 @@ def _retail_only(db: Session, current_user: CurrentUser) -> None:
 
 def _product_out(db: Session, product) -> ProductOut:
     """Serialize a product together with its variants."""
-    variants = (
-        db.query(ProductVariant)
-        .filter(ProductVariant.product_id == product.id)
-        .order_by(ProductVariant.id)
-        .all()
-    )
+    variants = ProductRepository(db, product.business_id).list_variants_for_products([product.id])
     out = ProductOut.model_validate(product)
     out.variants = variants
     return out
@@ -73,6 +69,17 @@ def list_products(current_user: CurrentUser = Depends(get_current_user), db: Ses
     _retail_only(db, current_user)
     products = ProductRepository(db, current_user.business_id).list_ordered()
     return [_product_out(db, product) for product in products]
+
+
+@router.get("/commerce/catalog-preview", response_model=CatalogResponse)
+def catalog_preview(
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CatalogResponse:
+    """Return the customer-facing catalog shape for owner preview/testing."""
+    _retail_only(db, current_user)
+    products = list_catalog_products(db, current_user.business_id, active_only=True)
+    return CatalogResponse(products=products, categories=catalog_categories(products))
 
 
 @router.post("/products", response_model=ProductOut, status_code=status.HTTP_201_CREATED)
@@ -184,10 +191,26 @@ def delete_delivery_zone(zone_id: int, current_user: CurrentUser = Depends(get_c
 
 
 @router.get("/orders", response_model=OrderPage)
-def list_orders(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_orders(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status_filter: OrderStatus | None = Query(None, alias="status"),
+    channel: CustomerChannel | None = None,
+    payment_status: PaymentStatus | None = None,
+    search: str | None = Query(None, max_length=120),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """List tenant-scoped orders with pagination."""
     _retail_only(db, current_user)
-    items, total = OrderRepository(db, current_user.business_id).list_paginated(page, page_size)
+    items, total = OrderRepository(db, current_user.business_id).list_paginated(
+        page,
+        page_size,
+        status=status_filter,
+        channel=channel,
+        payment_status=payment_status,
+        search=search,
+    )
     return OrderPage(items=[OrderOut.model_validate(order_to_dict(db, current_user.business_id, item)) for item in items], total=total, page=page, page_size=page_size)
 
 
@@ -220,6 +243,9 @@ def update_order_status(order_id: int, payload: OrderStatusUpdate, current_user:
     if payload.status != order.status and payload.status not in allowed[order.status]:
         raise HTTPException(status_code=400, detail="Invalid order status transition")
     order.status = payload.status
+    if payload.status == OrderStatus.cancelled:
+        order.cancelled_at = utcnow()
+        order.cancellation_reason = payload.cancellation_reason
     db.commit()
     db.refresh(order)
     return OrderOut.model_validate(order_to_dict(db, current_user.business_id, order))

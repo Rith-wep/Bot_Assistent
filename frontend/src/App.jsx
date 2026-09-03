@@ -7,11 +7,32 @@ import Landing from "./pages/landing/Landing";
 // never download recharts, qrcode.react, or any dashboard page just to
 // read the marketing site at "/".
 const AppShell = lazy(() => import("./AppShell"));
+const MiniShop = lazy(() => import("./pages/mini/MiniShop"));
 
 function AppShellLoading() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-page">
       <p className="text-sm text-ink-muted">Loading...</p>
+    </div>
+  );
+}
+
+function MiniAppLoading() {
+  return (
+    <div className="min-h-screen bg-white px-4 py-5">
+      <div className="mx-auto max-w-md">
+        <div className="h-8 w-40 animate-pulse rounded-md bg-gray-200" />
+        <div className="mt-4 h-11 animate-pulse rounded-xl bg-gray-200" />
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          {[0, 1, 2, 3].map((item) => (
+            <div key={item} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+              <div className="aspect-square animate-pulse rounded-lg bg-gray-200" />
+              <div className="mt-3 h-4 w-3/4 animate-pulse rounded bg-gray-200" />
+              <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-gray-200" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -43,6 +64,14 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route
+        path="/mini/shop/:businessId"
+        element={
+          <Suspense fallback={<MiniAppLoading />}>
+            <MiniShop />
+          </Suspense>
+        }
+      />
       <Route
         path="/app/*"
         element={

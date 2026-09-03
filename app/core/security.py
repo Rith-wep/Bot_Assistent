@@ -8,6 +8,7 @@ from app.core.config import settings
 _fernet = Fernet(settings.encryption_key.encode())
 
 _supabase_jwks_client: PyJWKClient | None = None
+_JWT_CLOCK_SKEW_LEEWAY_SECONDS = 60
 
 
 def decode_supabase_access_token(token: str) -> dict:
@@ -34,6 +35,7 @@ def decode_supabase_access_token(token: str) -> dict:
                 audience="authenticated",
                 issuer=settings.supabase_issuer,
                 options={"require": ["exp", "iss", "sub", "aud"]},
+                leeway=_JWT_CLOCK_SKEW_LEEWAY_SECONDS,
             )
         except InvalidAudienceError:
             # Supabase access tokens normally use "authenticated"; some local
@@ -45,6 +47,7 @@ def decode_supabase_access_token(token: str) -> dict:
                 algorithms=["HS256"],
                 issuer=settings.supabase_issuer,
                 options={"require": ["exp", "iss", "sub", "aud"], "verify_aud": False},
+                leeway=_JWT_CLOCK_SKEW_LEEWAY_SECONDS,
             )
             if payload.get("role") != "authenticated":
                 raise
@@ -67,6 +70,7 @@ def decode_supabase_access_token(token: str) -> dict:
             audience="authenticated",
             issuer=issuer,
             options={"require": ["exp", "iss", "sub", "aud"]},
+            leeway=_JWT_CLOCK_SKEW_LEEWAY_SECONDS,
         )
     except InvalidAudienceError:
         payload = jwt.decode(
@@ -75,6 +79,7 @@ def decode_supabase_access_token(token: str) -> dict:
             algorithms=["RS256", "ES256"],
             issuer=issuer,
             options={"require": ["exp", "iss", "sub", "aud"], "verify_aud": False},
+            leeway=_JWT_CLOCK_SKEW_LEEWAY_SECONDS,
         )
         if payload.get("role") != "authenticated":
             raise

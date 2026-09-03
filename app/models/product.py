@@ -1,11 +1,14 @@
 from decimal import Decimal
 from typing import Any
 
+from datetime import datetime
+
 from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.core.time import utcnow
 
 
 class Product(Base):
@@ -25,6 +28,8 @@ class Product(Base):
     photo_urls: Mapped[list[str]] = mapped_column(JSONB, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     sort_order: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 
 
 class ProductVariant(Base):
@@ -32,6 +37,9 @@ class ProductVariant(Base):
     __table_args__ = (Index("ix_product_variants_product_active", "product_id", "is_active"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    business_id: Mapped[int] = mapped_column(
+        ForeignKey("businesses.id"), nullable=False, index=True
+    )
     product_id: Mapped[int] = mapped_column(
         ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -40,3 +48,5 @@ class ProductVariant(Base):
     stock_quantity: Mapped[int] = mapped_column(default=0)
     sku: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)

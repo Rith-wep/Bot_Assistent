@@ -18,6 +18,7 @@ from app.routers import (
     health,
     knowledge,
     leads,
+    mini_app,
     onboarding,
     settings,
 )
@@ -43,6 +44,7 @@ api_router.include_router(knowledge.router)
 api_router.include_router(commerce.router)
 api_router.include_router(leads.router)
 api_router.include_router(conversations.router)
+api_router.include_router(mini_app.router)
 
 
 # ---------------------------------------------------------------------------

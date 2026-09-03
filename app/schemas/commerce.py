@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.order import OrderStatus, PaymentMethod
+from app.models.order import CustomerChannel, OrderStatus, PaymentMethod, PaymentStatus
 from app.schemas.common import UtcDatetime
 
 
@@ -53,6 +53,32 @@ class ProductOut(ProductBase):
     variants: list[ProductVariantOut] = []
 
 
+class CatalogVariantOut(BaseModel):
+    id: int
+    label: str
+    price: Decimal
+    stock_quantity: int
+    sku: str | None = None
+
+
+class CatalogProductOut(BaseModel):
+    id: int
+    name_en: str
+    name_km: str | None = None
+    description_en: str | None = None
+    description_km: str | None = None
+    category: str | None = None
+    price: Decimal
+    photo_urls: list[str] = []
+    in_stock: bool
+    variants: list[CatalogVariantOut] = []
+
+
+class CatalogResponse(BaseModel):
+    products: list[CatalogProductOut]
+    categories: list[str]
+
+
 class ProductDraft(ProductCreate):
     pass
 
@@ -94,6 +120,8 @@ class OrderItemIn(BaseModel):
 
 class OrderCreate(BaseModel):
     conversation_id: int
+    channel: CustomerChannel = CustomerChannel.telegram
+    external_customer_id: str | None = Field(default=None, max_length=120)
     customer_name: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, max_length=50)
     items: list[OrderItemIn] = Field(min_length=1)
@@ -104,15 +132,30 @@ class OrderCreate(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus
+    cancellation_reason: str | None = Field(default=None, max_length=1000)
+
+
+class OrderItemOut(BaseModel):
+    id: int | None = None
+    product_id: int
+    variant_id: int | None = None
+    product_name: str
+    variant_label: str | None = None
+    unit_price: Decimal
+    qty: int
+    line_total: Decimal
 
 
 class OrderOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    order_number: str
     conversation_id: int
+    channel: CustomerChannel
+    external_customer_id: str | None
     customer_name: str | None
     phone: str | None
-    items: list[dict[str, Any]]
+    items: list[OrderItemOut | dict[str, Any]]
     delivery_zone_id: int | None
     delivery_zone_name: str | None = None
     delivery_address_text: str
@@ -120,8 +163,12 @@ class OrderOut(BaseModel):
     items_total: Decimal
     grand_total: Decimal
     payment_method: PaymentMethod
+    payment_status: PaymentStatus
     status: OrderStatus
     created_at: UtcDatetime
+    updated_at: UtcDatetime
+    cancelled_at: UtcDatetime | None = None
+    cancellation_reason: str | None = None
 
 
 class OrderPage(BaseModel):
