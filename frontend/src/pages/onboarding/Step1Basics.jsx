@@ -1,6 +1,7 @@
 import { ArrowRight, CalendarCheck, Check, Eye, ShoppingBag, UserRound } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { apiFetch, ApiError } from "../../api/client";
+import useSessionStorageState from "../../hooks/useSessionStorageState";
 
 const BUSINESS_TYPES = [
   {
@@ -66,11 +67,11 @@ const TEMPLATE_PREVIEWS = {
 const LANGUAGES = [
   { value: "km", label: "Khmer" },
   { value: "en", label: "English" },
-  { value: "both", label: "Both Khmer and English" },
+  { value: "both", label: "Khmer + English" },
 ];
 
 const fieldClass =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-ink shadow-sm transition-colors duration-150 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
+  "block w-full max-w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-ink shadow-sm transition-colors duration-150 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "mb-1.5 block text-sm font-semibold text-ink";
 
 const BusinessTypeCard = memo(function BusinessTypeCard({ option, selected, onSelect }) {
@@ -178,9 +179,18 @@ const TemplatePreview = memo(function TemplatePreview({ businessName, businessTy
 });
 
 export default function Step1Basics({ status, onAdvance }) {
-  const [businessName, setBusinessName] = useState(status.business_name);
-  const [businessType, setBusinessType] = useState(status.business_type);
-  const [defaultLanguage, setDefaultLanguage] = useState(status.default_language || "km");
+  const [businessName, setBusinessName] = useSessionStorageState(
+    "onboarding:step1:businessName",
+    status.business_name
+  );
+  const [businessType, setBusinessType] = useSessionStorageState(
+    "onboarding:step1:businessType",
+    status.business_type
+  );
+  const [defaultLanguage, setDefaultLanguage] = useSessionStorageState(
+    "onboarding:step1:defaultLanguage",
+    status.default_language || "km"
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -197,7 +207,7 @@ export default function Step1Basics({ status, onAdvance }) {
     setError("");
     setSaving(true);
     try {
-      await apiFetch("/onboarding/step1", {
+      const nextStatus = await apiFetch("/onboarding/step1", {
         method: "PUT",
         body: {
           business_name: businessName,
@@ -205,7 +215,10 @@ export default function Step1Basics({ status, onAdvance }) {
           default_language: defaultLanguage,
         },
       });
-      await onAdvance();
+      sessionStorage.removeItem("onboarding:step1:businessName");
+      sessionStorage.removeItem("onboarding:step1:businessType");
+      sessionStorage.removeItem("onboarding:step1:defaultLanguage");
+      onAdvance(nextStatus);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save. Please try again.");
       setSaving(false);
@@ -268,7 +281,7 @@ export default function Step1Basics({ status, onAdvance }) {
             <select
               value={defaultLanguage}
               onChange={(e) => setDefaultLanguage(e.target.value)}
-              className={fieldClass}
+              className={`${fieldClass} hidden sm:block`}
             >
               {LANGUAGES.map((language) => (
                 <option key={language.value} value={language.value}>
@@ -276,26 +289,79 @@ export default function Step1Basics({ status, onAdvance }) {
                 </option>
               ))}
             </select>
+            <div className="grid gap-2 sm:hidden">
+              {LANGUAGES.map((language) => {
+                const selected = defaultLanguage === language.value;
+                return (
+                  <button
+                    key={language.value}
+                    type="button"
+                    onClick={() => setDefaultLanguage(language.value)}
+                    className={`flex min-h-11 w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                      selected
+                        ? "border-accent bg-accent-soft/35 text-ink"
+                        : "border-slate-200 bg-white text-slate-700"
+                    }`}
+                  >
+                    <span>{language.label}</span>
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-full border ${
+                        selected ? "border-accent bg-accent text-white" : "border-slate-300"
+                      }`}
+                    >
+                      {selected && <Check className="h-3 w-3" strokeWidth={3} />}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 lg:hidden">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-accent-dark shadow-sm ring-1 ring-slate-200">
-                <Eye className="h-4 w-4" />
-              </span>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Preview</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {(TEMPLATE_PREVIEWS[businessType] || TEMPLATE_PREVIEWS.professional_other).map(
-                (item) => (
-                  <span
-                    key={item}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
-                  >
-                    {item}
+          <div className="space-y-4 lg:hidden">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent-dark">
+                    <UserRound className="h-5 w-5" />
                   </span>
-                )
-              )}
+                  <p className="font-heading text-sm font-bold text-ink">Assistant Preview</p>
+                </div>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm">
+                  {defaultLanguage === "both" ? "Bilingual" : defaultLanguage.toUpperCase()}
+                </span>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="max-w-[88%] rounded-2xl rounded-tl-md bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+                  Hello, do you have anything available?
+                </div>
+                <div className="ml-auto mt-3 max-w-[90%] rounded-2xl rounded-tr-md border border-accent/30 bg-accent-soft/50 px-4 py-3 text-sm font-medium text-accent-dark shadow-sm">
+                  {businessName?.trim()
+                    ? `Hi! Welcome to ${businessName.trim()}. How can I help you today?`
+                    : "Hi! Welcome to your business. How can I help you today?"}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-accent-dark shadow-sm ring-1 ring-slate-200">
+                  <Eye className="h-4 w-4" />
+                </span>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Preview</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(TEMPLATE_PREVIEWS[businessType] || TEMPLATE_PREVIEWS.professional_other).map(
+                  (item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
+                    >
+                      {item}
+                    </span>
+                  )
+                )}
+              </div>
             </div>
           </div>
 

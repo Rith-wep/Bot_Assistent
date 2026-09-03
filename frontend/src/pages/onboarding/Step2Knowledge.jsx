@@ -4,6 +4,7 @@ import { apiFetch, ApiError } from "../../api/client";
 import Button from "../../components/Button";
 import KnowledgeItemForm, { EMPTY_KNOWLEDGE_FORM } from "../../components/KnowledgeItemForm";
 import { RowListSkeleton } from "../../components/Skeleton";
+import useSessionStorageState from "../../hooks/useSessionStorageState";
 
 const AiQuickAdd = lazy(() => import("../../components/AiQuickAdd"));
 
@@ -13,13 +14,21 @@ const TABS = [
   { key: "faqs", label: "FAQs" },
 ];
 
+const PERSONALITIES = [
+  { value: "professional", label: "Professional" },
+  { value: "friendly", label: "Friendly" },
+  { value: "casual", label: "Casual" },
+  { value: "luxury", label: "Luxury" },
+  { value: "sales", label: "Sales" },
+];
+
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-ink transition-colors duration-150 focus:border-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-accent";
 
 function SuggestionRow({ title, category, onAdd, onSkip }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3 last:border-b-0">
-      <span className="min-w-0 truncate text-sm font-medium text-ink">{title}</span>
+      <span className="min-w-0 text-sm font-medium text-ink sm:truncate">{title}</span>
       <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
@@ -43,14 +52,20 @@ function SuggestionRow({ title, category, onAdd, onSkip }) {
 function AddedRow({ item }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3 last:border-b-0">
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 items-start gap-2 sm:items-center">
         <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft">
           <Check className="h-3 w-3 text-accent-dark" strokeWidth={3} />
         </div>
-        <span className="truncate text-sm font-medium text-ink">{item.title}</span>
-        {item.price && <span className="text-sm font-semibold text-accent-dark">{item.price}</span>}
+        <div className="min-w-0">
+          <span className="block text-sm font-medium text-ink sm:truncate">{item.title}</span>
+          {item.price && (
+            <span className="mt-1 block text-sm font-semibold text-accent-dark sm:mt-0">
+              {item.price}
+            </span>
+          )}
+        </div>
       </div>
-      <span className="rounded-full border border-accent/30 bg-accent-soft/50 px-2.5 py-1 text-xs font-semibold text-accent-dark">
+      <span className="w-fit rounded-full border border-accent/30 bg-accent-soft/50 px-2.5 py-1 text-xs font-semibold text-accent-dark">
         Completed
       </span>
     </div>
@@ -66,11 +81,19 @@ function EmptyTabState({ label }) {
   );
 }
 
-export default function Step2Knowledge({ onAdvance, onBack }) {
-  const [items, setItems] = useState([]);
-  const [templates, setTemplates] = useState({ starter_items: [], faqs: [] });
-  const [aiProfile, setAiProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function Step2Knowledge({
+  cachedData,
+  onDataChange,
+  onChecklistStale,
+  onAdvance,
+  onBack,
+}) {
+  const [items, setItems] = useState(cachedData?.items || []);
+  const [templates, setTemplates] = useState(
+    cachedData?.templates || { starter_items: [], faqs: [] }
+  );
+  const [aiProfile, setAiProfile] = useSessionStorageState("onboarding:step2:aiProfile", null);
+  const [loading, setLoading] = useState(!cachedData);
   const [error, setError] = useState("");
   const [advanceError, setAdvanceError] = useState("");
   const [advancing, setAdvancing] = useState(false);
@@ -84,6 +107,13 @@ export default function Step2Knowledge({ onAdvance, onBack }) {
     if (showLoading) setLoading(true);
     setError("");
     try {
+      if (cachedData) {
+        setItems(cachedData.items);
+        setTemplates(cachedData.templates);
+        setAiProfile((draft) => draft || cachedData.aiProfile);
+        return;
+      }
+
       const [itemsData, templatesData, settingsData] = await Promise.all([
         apiFetch("/knowledge"),
         apiFetch("/onboarding/templates"),
@@ -91,7 +121,12 @@ export default function Step2Knowledge({ onAdvance, onBack }) {
       ]);
       setItems(itemsData);
       setTemplates(templatesData);
-      setAiProfile(settingsData.ai_profile);
+      setAiProfile((draft) => draft || settingsData.ai_profile);
+      onDataChange?.({
+        items: itemsData,
+        templates: templatesData,
+        aiProfile: settingsData.ai_profile,
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not load knowledge setup.");
     } finally {
@@ -104,7 +139,10 @@ export default function Step2Knowledge({ onAdvance, onBack }) {
   }, []);
 
   async function reloadKnowledgeOnly() {
-    setItems(await apiFetch("/knowledge"));
+    const nextItems = await apiFetch("/knowledge");
+    setItems(nextItems);
+    onDataChange?.({ items: nextItems, templates, aiProfile });
+    onChecklistStale?.();
   }
 
   async function handleCreate(values) {
@@ -122,8 +160,9 @@ export default function Step2Knowledge({ onAdvance, onBack }) {
     setAdvanceError("");
     setAdvancing(true);
     try {
-      await apiFetch("/onboarding/step2/complete", { method: "POST" });
-      await onAdvance();
+      const nextStatus = await apiFetch("/onboarding/step2/complete", { method: "POST" });
+      onChecklistStale?.();
+      onAdvance(nextStatus);
     } catch (err) {
       setAdvanceError(err instanceof ApiError ? err.message : "Could not continue.");
     } finally {
@@ -136,6 +175,7 @@ export default function Step2Knowledge({ onAdvance, onBack }) {
     try {
       const saved = await apiFetch("/settings/ai-profile", { method: "PUT", body: aiProfile });
       setAiProfile(saved);
+      onDataChange?.({ items, templates, aiProfile: saved });
     } finally {
       setSavingProfile(false);
     }
@@ -215,16 +255,44 @@ export default function Step2Knowledge({ onAdvance, onBack }) {
                 placeholder="Assistant name"
               />
               <select
-                className={inputClass}
+                className={`${inputClass} hidden sm:block`}
                 value={aiProfile.personality}
                 onChange={(e) => setAiProfile({ ...aiProfile, personality: e.target.value })}
               >
-                <option value="professional">Professional</option>
-                <option value="friendly">Friendly</option>
-                <option value="casual">Casual</option>
-                <option value="luxury">Luxury</option>
-                <option value="sales">Sales</option>
+                {PERSONALITIES.map((personality) => (
+                  <option key={personality.value} value={personality.value}>
+                    {personality.label}
+                  </option>
+                ))}
               </select>
+              <div className="grid gap-2 sm:hidden">
+                {PERSONALITIES.map((personality) => {
+                  const selected = aiProfile.personality === personality.value;
+                  return (
+                    <button
+                      key={personality.value}
+                      type="button"
+                      onClick={() =>
+                        setAiProfile({ ...aiProfile, personality: personality.value })
+                      }
+                      className={`flex min-h-10 w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors ${
+                        selected
+                          ? "border-accent bg-accent-soft/35 text-ink"
+                          : "border-slate-200 bg-white text-slate-700"
+                      }`}
+                    >
+                      <span>{personality.label}</span>
+                      <span
+                        className={`flex h-5 w-5 items-center justify-center rounded-full border ${
+                          selected ? "border-accent bg-accent text-white" : "border-slate-300"
+                        }`}
+                      >
+                        {selected && <Check className="h-3 w-3" strokeWidth={3} />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <Button
@@ -481,7 +549,7 @@ export default function Step2Knowledge({ onAdvance, onBack }) {
         <p className="mt-4 rounded-lg bg-error-soft px-3 py-2 text-sm text-error">{advanceError}</p>
       )}
 
-      <div className="sticky bottom-4 z-20 mt-6 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/60 backdrop-blur">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"

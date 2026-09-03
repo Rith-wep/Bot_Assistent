@@ -170,13 +170,13 @@ const ContextSidebar = memo(function ContextSidebar({ conversation, onToggleHand
               onClick={() => onToggleHandoff(!conversation?.handed_off)}
               className={`flex h-7 w-12 items-center rounded-full p-1 transition-colors ${
                 conversation?.handed_off ? "bg-accent-soft ring-1 ring-accent/50" : "bg-slate-300"
-              } disabled:opacity-60`}
+              } disabled:cursor-wait disabled:opacity-70`}
               aria-label="Toggle human handoff"
             >
               <span
                 className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
                   conversation?.handed_off ? "translate-x-5" : "translate-x-0"
-                }`}
+                } ${toggling ? "animate-pulse" : ""}`}
               />
             </button>
           </div>
@@ -308,8 +308,20 @@ export default function Conversations() {
 
   const handleToggleHandoff = useCallback(async (nextValue) => {
     if (!selectedId) return;
+    const previousConversation = conversation;
+    const previousOverride = listOverrides[selectedId];
+    const base = conversation || selectedSummary;
+
     setToggling(true);
     setActionError("");
+    if (base) {
+      setDetailOverride({ ...base, handed_off: nextValue });
+    }
+    setListOverrides((current) => ({
+      ...current,
+      [selectedId]: { ...(current[selectedId] || {}), handed_off: nextValue },
+    }));
+
     try {
       const updated = await apiFetch(`/conversations/${selectedId}/handoff`, {
         method: "PATCH",
@@ -321,11 +333,21 @@ export default function Conversations() {
         [selectedId]: { handed_off: updated.handed_off },
       }));
     } catch (error) {
+      setDetailOverride(previousConversation);
+      setListOverrides((current) => {
+        const next = { ...current };
+        if (previousOverride) {
+          next[selectedId] = previousOverride;
+        } else {
+          delete next[selectedId];
+        }
+        return next;
+      });
       setActionError(error instanceof ApiError ? error.message : "Unable to update handoff");
     } finally {
       setToggling(false);
     }
-  }, [selectedId]);
+  }, [conversation, listOverrides, selectedId, selectedSummary]);
 
   async function handleSend(event) {
     event.preventDefault();
@@ -478,7 +500,7 @@ export default function Conversations() {
                     (conversation || selectedSummary)?.handed_off
                       ? "border border-accent/40 bg-accent-soft/70 text-accent-dark hover:border-accent-dark"
                       : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
+                  } disabled:cursor-wait`}
                 >
                   <Circle className="h-3.5 w-3.5 fill-current" />
                   {(conversation || selectedSummary)?.handed_off ? "Human mode" : "AI mode"}

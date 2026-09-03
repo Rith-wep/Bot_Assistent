@@ -119,7 +119,12 @@ def update_handoff(
     conversation.handed_off = payload.handed_off
     db.add(conversation)
     db.commit()
-    return get_conversation(conversation_id, current_user, db)
+    return get_conversation(
+        conversation_id=conversation_id,
+        message_limit=120,
+        current_user=current_user,
+        db=db,
+    )
 
 
 @router.post("/{conversation_id}/reply", response_model=MessageOut)

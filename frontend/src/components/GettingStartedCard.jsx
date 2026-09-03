@@ -9,7 +9,6 @@ function buildSteps(checklist) {
     {
       key: "knowledge_added",
       label: "Add knowledge",
-      why: "So your assistant can answer customers accurately",
       icon: BookOpen,
       to: "/app/knowledge",
       done: checklist.knowledge_added,
@@ -17,7 +16,6 @@ function buildSteps(checklist) {
     {
       key: "telegram_connected",
       label: "Connect Telegram bot",
-      why: "So customers can actually message your assistant",
       icon: Send,
       to: "/app/settings",
       done: checklist.telegram_connected,
@@ -25,7 +23,6 @@ function buildSteps(checklist) {
     {
       key: "admin_notifications_connected",
       label: "Connect admin notifications",
-      why: "So you get notified about new leads and handoffs",
       icon: Bell,
       to: "/app/settings",
       done: checklist.admin_notifications_connected,
@@ -33,7 +30,6 @@ function buildSteps(checklist) {
     {
       key: "payments_enabled",
       label: "Enable payments",
-      why: "Not available yet, coming soon",
       icon: CreditCard,
       to: null,
       done: checklist.payments_enabled,
@@ -111,7 +107,6 @@ export default function GettingStartedCard({ checklist }) {
                 <p className={`text-sm font-semibold ${step.done ? "text-gray-400" : "text-gray-900"}`}>
                   {step.label}
                 </p>
-                {!step.done && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{step.why}</p>}
               </div>
               {interactive && <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" strokeWidth={2} />}
               {!step.done && !step.to && (
@@ -121,7 +116,7 @@ export default function GettingStartedCard({ checklist }) {
               )}
             </>
           );
-          const rowClass = `flex min-h-20 items-center gap-3 rounded-lg border px-3 py-3 transition-all duration-150 ${
+          const rowClass = `flex min-h-16 items-center gap-3 rounded-lg border px-3 py-3 transition-all duration-150 ${
             step.done
               ? "border-gray-100 bg-gray-50/70"
               : isNext

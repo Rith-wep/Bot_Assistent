@@ -19,6 +19,7 @@ import {
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, ApiError } from "../../api/client";
 import Button from "../../components/Button";
+import Skeleton from "../../components/Skeleton";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -82,9 +83,50 @@ const TimelineStep = memo(function TimelineStep({ step, index }) {
   );
 });
 
-export default function Step3Telegram({ onAdvance, onBack, onSkip }) {
-  const [loading, setLoading] = useState(true);
-  const [telegramStatus, setTelegramStatus] = useState(null);
+function Step3Skeleton() {
+  return (
+    <div className="w-full pb-8">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_460px]">
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+          <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="mt-4 h-8 w-64 max-w-full" />
+          <div className="mt-6 grid gap-3">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="flex gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
+                <div className="flex-1">
+                  <Skeleton className="mb-3 h-4 w-40 max-w-full" />
+                  <Skeleton className="h-7 w-28 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <aside className="space-y-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-11 w-11 rounded-xl" />
+              <Skeleton className="h-5 w-36" />
+            </div>
+            <Skeleton className="mt-5 h-10 w-full" />
+            <Skeleton className="mt-3 h-10 w-full" />
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+export default function Step3Telegram({
+  cachedTelegramStatus,
+  onTelegramStatusChange,
+  onChecklistStale,
+  onAdvance,
+  onBack,
+  onSkip,
+}) {
+  const [loading, setLoading] = useState(!cachedTelegramStatus);
+  const [telegramStatus, setTelegramStatus] = useState(cachedTelegramStatus);
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [validation, setValidation] = useState(null);
@@ -98,16 +140,23 @@ export default function Step3Telegram({ onAdvance, onBack, onSkip }) {
     try {
       const data = await apiFetch("/onboarding/telegram/status");
       setTelegramStatus(data);
+      onTelegramStatusChange?.(data);
       return data;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onTelegramStatusChange]);
 
   useEffect(() => {
+    if (cachedTelegramStatus) {
+      setTelegramStatus(cachedTelegramStatus);
+      setLoading(false);
+      return undefined;
+    }
+
     loadTelegramStatus();
     return () => clearInterval(pollRef.current);
-  }, [loadTelegramStatus]);
+  }, [cachedTelegramStatus, loadTelegramStatus]);
 
   useEffect(() => {
     clearInterval(pollRef.current);
@@ -149,6 +198,7 @@ export default function Step3Telegram({ onAdvance, onBack, onSkip }) {
         method: "POST",
         body: { token: token.trim() },
       });
+      onChecklistStale?.();
       await loadTelegramStatus();
     } catch (err) {
       setConnectError(err instanceof ApiError ? err.message : "Could not connect this bot.");
@@ -160,8 +210,8 @@ export default function Step3Telegram({ onAdvance, onBack, onSkip }) {
   async function handleContinue() {
     setAdvancing(true);
     try {
-      await apiFetch("/onboarding/step3/complete", { method: "POST" });
-      await onAdvance();
+      const nextStatus = await apiFetch("/onboarding/step3/complete", { method: "POST" });
+      onAdvance(nextStatus);
     } finally {
       setAdvancing(false);
     }
@@ -170,7 +220,7 @@ export default function Step3Telegram({ onAdvance, onBack, onSkip }) {
   const tokenReady = token.trim().length > 0;
 
   if (loading) {
-    return <p className="text-sm text-ink-muted">Loading...</p>;
+    return <Step3Skeleton />;
   }
 
   if (telegramStatus?.owner_linked) {
@@ -189,7 +239,7 @@ export default function Step3Telegram({ onAdvance, onBack, onSkip }) {
           </p>
         </div>
 
-        <div className="sticky bottom-4 z-20 mt-6 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/60 backdrop-blur">
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <button
               type="button"
@@ -395,28 +445,49 @@ export default function Step3Telegram({ onAdvance, onBack, onSkip }) {
         </aside>
       </div>
 
-      <div className="sticky bottom-4 z-20 mt-6 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/60 backdrop-blur">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-ink"
+            className="hidden min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-ink sm:inline-flex"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="ghost" onClick={onSkip}>
-              Skip for now
-            </Button>
+          <div className="grid grid-cols-2 gap-2 sm:hidden">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-ink"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
             <Button
               onClick={handleContinue}
               disabled
               title="Connect your bot and link the owner before continuing."
+              className="w-full"
             >
               Continue
               <ArrowRight className="h-4 w-4" />
             </Button>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="ghost" onClick={onSkip}>
+              Skip for now
+            </Button>
+            <div className="hidden sm:block">
+              <Button
+                onClick={handleContinue}
+                disabled
+                title="Connect your bot and link the owner before continuing."
+              >
+                Continue
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>

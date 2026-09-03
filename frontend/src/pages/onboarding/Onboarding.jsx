@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { apiFetch, ApiError } from "../../api/client";
 import Stepper from "../../components/Stepper";
 import Logo from "../../components/Logo";
+import Skeleton from "../../components/Skeleton";
 
 const Step1Basics = lazy(() => import("./Step1Basics"));
 const Step2Knowledge = lazy(() => import("./Step2Knowledge"));
@@ -22,8 +23,44 @@ function StepFallback() {
   );
 }
 
+function OnboardingShellSkeleton() {
+  return (
+    <div className="min-h-screen bg-page">
+      <header className="border-b border-slate-200 bg-white/90">
+        <div className="mx-auto flex min-h-16 w-full max-w-7xl items-center justify-between px-4 py-2 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-14 w-24 rounded-xl" />
+            <div className="hidden sm:block">
+              <Skeleton className="mb-2 h-4 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+          <Skeleton className="h-7 w-24 rounded-full" />
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 sm:px-6 sm:pt-10 lg:px-8">
+        <div className="mb-6 grid grid-cols-4 gap-3 sm:mb-10">
+          {[0, 1, 2, 3].map((item) => (
+            <div key={item} className="flex flex-col items-center">
+              <Skeleton className="h-8 w-8 rounded-full sm:h-10 sm:w-10" />
+              <Skeleton className="mt-2 h-3 w-14" />
+            </div>
+          ))}
+        </div>
+        <StepFallback />
+      </main>
+    </div>
+  );
+}
+
 export default function Onboarding() {
   const [status, setStatus] = useState(null);
+  const [stepData, setStepData] = useState({
+    step2: null,
+    telegramStatus: null,
+    checklist: null,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -50,13 +87,15 @@ export default function Onboarding() {
       ),
     []
   );
+  const applyStatus = useCallback((nextStatus) => {
+    if (nextStatus) setStatus(nextStatus);
+  }, []);
+  const updateStepData = useCallback((key, value) => {
+    setStepData((current) => ({ ...current, [key]: value }));
+  }, []);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-page">
-        <p className="text-sm text-ink-muted">Loading...</p>
-      </div>
-    );
+    return <OnboardingShellSkeleton />;
   }
 
   if (error || !status) {
@@ -93,19 +132,37 @@ export default function Onboarding() {
 
         <div className="w-full">
           <Suspense fallback={<StepFallback />}>
-            {step === 1 && <Step1Basics status={status} onAdvance={loadStatus} />}
+            {step === 1 && <Step1Basics status={status} onAdvance={applyStatus} />}
             {step === 2 && (
-              <Step2Knowledge status={status} onAdvance={loadStatus} onBack={() => goToStep(1)} />
+              <Step2Knowledge
+                status={status}
+                cachedData={stepData.step2}
+                onDataChange={(data) => updateStepData("step2", data)}
+                onChecklistStale={() => updateStepData("checklist", null)}
+                onAdvance={applyStatus}
+                onBack={() => goToStep(1)}
+              />
             )}
             {step === 3 && (
               <Step3Telegram
                 status={status}
-                onAdvance={loadStatus}
+                cachedTelegramStatus={stepData.telegramStatus}
+                onTelegramStatusChange={(data) => updateStepData("telegramStatus", data)}
+                onChecklistStale={() => updateStepData("checklist", null)}
+                onAdvance={applyStatus}
                 onBack={() => goToStep(2)}
                 onSkip={() => goToStep(4)}
               />
             )}
-            {step === 4 && <Step4GoLive status={status} onAdvance={loadStatus} onBack={() => goToStep(3)} />}
+            {step === 4 && (
+              <Step4GoLive
+                status={status}
+                cachedChecklist={stepData.checklist}
+                onChecklistChange={(data) => updateStepData("checklist", data)}
+                onAdvance={loadStatus}
+                onBack={() => goToStep(3)}
+              />
+            )}
           </Suspense>
         </div>
       </main>

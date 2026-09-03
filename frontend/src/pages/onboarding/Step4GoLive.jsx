@@ -2,6 +2,7 @@ import { ArrowLeft, Check, ExternalLink, PartyPopper, Send } from "lucide-react"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, ApiError } from "../../api/client";
 import Button from "../../components/Button";
+import Skeleton from "../../components/Skeleton";
 
 const ChecklistRow = memo(function ChecklistRow({ done, children }) {
   return (
@@ -18,9 +19,43 @@ const ChecklistRow = memo(function ChecklistRow({ done, children }) {
   );
 });
 
-export default function Step4GoLive({ onBack }) {
-  const [checklist, setChecklist] = useState(null);
-  const [loading, setLoading] = useState(true);
+function Step4Skeleton() {
+  return (
+    <div>
+      <Skeleton className="h-8 w-56 max-w-full" />
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+          <div className="mt-5 space-y-4">
+            {[0, 1, 2].map((item) => (
+              <div key={item} className="flex items-center gap-3">
+                <Skeleton className="h-5 w-5 rounded-full" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            ))}
+          </div>
+          <Skeleton className="mt-7 h-10 w-full" />
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+          <Skeleton className="mb-5 h-5 w-24" />
+          <Skeleton className="h-16 w-4/5 rounded-2xl" />
+          <Skeleton className="ml-auto mt-3 h-16 w-4/5 rounded-2xl" />
+          <div className="mt-7 flex gap-2">
+            <Skeleton className="h-10 flex-1" />
+            <Skeleton className="h-10 w-12" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Step4GoLive({ cachedChecklist, onChecklistChange, onBack }) {
+  const [checklist, setChecklist] = useState(cachedChecklist);
+  const [loading, setLoading] = useState(!cachedChecklist);
   const [error, setError] = useState("");
 
   const [history, setHistory] = useState([]);
@@ -36,16 +71,23 @@ export default function Step4GoLive({ onBack }) {
     try {
       const data = await apiFetch("/onboarding/checklist");
       setChecklist(data);
+      onChecklistChange?.(data);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not load checklist.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onChecklistChange]);
 
   useEffect(() => {
+    if (cachedChecklist) {
+      setChecklist(cachedChecklist);
+      setLoading(false);
+      return;
+    }
+
     loadChecklist();
-  }, [loadChecklist]);
+  }, [cachedChecklist, loadChecklist]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: history.length > 1 ? "smooth" : "auto" });
@@ -93,7 +135,7 @@ export default function Step4GoLive({ onBack }) {
     }
   }, []);
 
-  if (loading) return <p className="text-sm text-ink-muted">Loading...</p>;
+  if (loading) return <Step4Skeleton />;
   if (error) return <p className="rounded-lg bg-error-soft px-3 py-2 text-sm text-error">{error}</p>;
 
   if (liveResult?.onboarding_completed) {
@@ -208,7 +250,7 @@ export default function Step4GoLive({ onBack }) {
         </div>
       </div>
 
-      <div className="sticky bottom-4 z-20 mt-6 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/60 backdrop-blur">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         <button
           type="button"
           onClick={onBack}
