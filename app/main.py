@@ -4,6 +4,9 @@ This module creates the web application, attaches middleware and API routers,
 and serves the compiled frontend when a production build is present.
 """
 
+import asyncio
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -13,8 +16,33 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.engine import BotEngine
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    bot_engine = None
+    bot_task = None
+
+    if settings.run_bot_in_web:
+        bot_engine = BotEngine()
+        bot_task = asyncio.create_task(bot_engine.run_forever())
+        logger.info("Telegram bot engine started inside web service")
+
+    try:
+        yield
+    finally:
+        if bot_task is not None:
+            bot_task.cancel()
+            try:
+                await bot_task
+            except asyncio.CancelledError:
+                pass
+        if bot_engine is not None:
+            await bot_engine.stop_all()
 
 
 # ---------------------------------------------------------------------------
@@ -22,7 +50,7 @@ FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 # ---------------------------------------------------------------------------
 
 
-app = FastAPI(title="Khmer AI Customer Assistant")
+app = FastAPI(title="Khmer AI Customer Assistant", lifespan=lifespan)
 
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
     ai_model: str = "openai/gpt-oss-20b"
     app_env: str = "development"
+    run_bot_in_web: bool = False
     frontend_url: str = "http://localhost:5173"
     # Comma-separated emails allowed onto the internal admin page (just you —
     # see CLAUDE.md's "Internal admin page"). Not a role/schema change since

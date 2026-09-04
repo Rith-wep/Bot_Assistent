@@ -7,9 +7,10 @@ runs a single Application for one business.
 import logging
 
 from fastapi import HTTPException
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
+from app.core.config import settings
 from app.core.time import utcnow
 from app.db.session import SessionLocal
 from app.models.bot_config import BotConfig
@@ -63,6 +64,24 @@ def _product_ids_for_photo_reply(db, business_id: int, message: str, commerce: d
     )
     return [product.id for product in products]
 
+
+def _mini_app_keyboard(business_id: int) -> InlineKeyboardMarkup | None:
+    """Return a Telegram Mini App button when a public frontend URL is configured."""
+    frontend_url = settings.frontend_url.split(",")[0].strip().rstrip("/")
+    if not frontend_url or "localhost" in frontend_url:
+        return None
+
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    "Open shop",
+                    web_app=WebAppInfo(url=f"{frontend_url}/mini/shop/{business_id}"),
+                )
+            ]
+        ]
+    )
+
 # ---------------------------------------------------------------------------
 # Customer message handler
 # ---------------------------------------------------------------------------
@@ -84,6 +103,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         product_ids = _product_ids_for_photo_reply(db, business_id, customer_message, commerce)
         if product_ids:
+            mini_app_keyboard = _mini_app_keyboard(business_id)
+            if mini_app_keyboard is not None:
+                await update.message.reply_text(
+                    "Browse products and order in the shop:",
+                    reply_markup=mini_app_keyboard,
+                )
+
             products = (
                 db.query(Product)
                 .filter(

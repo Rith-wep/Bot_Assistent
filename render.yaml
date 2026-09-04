@@ -11,6 +11,8 @@ services:
         value: production
       - key: AI_MODEL
         value: openai/gpt-oss-20b
+      - key: RUN_BOT_IN_WEB
+        value: true
       - key: FRONTEND_URL
         sync: false
       - key: DATABASE_URL
